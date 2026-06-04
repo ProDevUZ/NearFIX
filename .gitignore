@@ -1,0 +1,19 @@
+node_modules/
+.expo/
+.expo-home/
+.env
+.expo-start.*.log
+dist/
+dist-test/
+dist-test-*/
+dist-test-ios/
+web-build/
+backend/uploads/
+expo-qr.png
+nearfixFront/
+Telegram Archive/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+.DS_Store

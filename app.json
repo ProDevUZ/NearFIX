@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "NearFIX",
+    "slug": "nearfix-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "NearFIX xaritada joriy joylashuvingizni ko'rsatish uchun lokatsiyaga ruxsat kerak."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "uz.nearfix.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NearFIX chatda rasmga olish uchun kameraga ruxsat kerak.",
+        "NSPhotoLibraryUsageDescription": "NearFIX chatda rasm tanlash uchun galereyaga ruxsat kerak.",
+        "NSLocationWhenInUseUsageDescription": "NearFIX xaritada joriy joylashuvingizni ko'rsatish uchun lokatsiyaga ruxsat kerak."
+      }
+    },
+    "android": {
+      "package": "uz.nearfix.app",
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#0F719D"
+      }
+    },
+    "extra": {
+      "authEnabled": false,
+      "paymentsEnabled": false,
+      "apiBaseUrl": "mock://nearfix"
+    }
+  }
+}

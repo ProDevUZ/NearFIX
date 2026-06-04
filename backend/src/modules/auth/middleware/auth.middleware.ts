@@ -1,0 +1,27 @@
+import type { RequestHandler } from "express";
+import { bearerTokenSchema } from "../auth.contracts.js";
+import { getSessionUser } from "../auth.service.js";
+
+export const authenticate: RequestHandler = async (request, _response, next) => {
+  try {
+    const accessToken = bearerTokenSchema.parse(request.headers.authorization || "");
+    const user = await getSessionUser(accessToken);
+
+    request.accessToken = accessToken;
+    request.user = user;
+
+    next();
+  } catch (error) {
+    if (typeof error === "object" && error && "status" in error && error.status === 401) {
+      next(error);
+      return;
+    }
+
+    next(
+      Object.assign(new Error("Unauthorized"), {
+        status: 401,
+        code: "UNAUTHORIZED"
+      })
+    );
+  }
+};

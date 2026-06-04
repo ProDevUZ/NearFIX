@@ -1,0 +1,39 @@
+"use client";
+
+import { Bell, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useAdminUiStore } from "@/stores/ui-store";
+
+export function Topbar() {
+  const globalSearch = useAdminUiStore((state) => state.globalSearch);
+  const setGlobalSearch = useAdminUiStore((state) => state.setGlobalSearch);
+
+  return (
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-8 backdrop-blur">
+      <div className="relative w-full max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          onChange={(event) => setGlobalSearch(event.target.value)}
+          placeholder="Order, worker yoki user qidirish"
+          value={globalSearch}
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button className="flex h-10 w-10 items-center justify-center rounded-md border bg-card text-muted-foreground">
+          <Bell className="h-4 w-4" />
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            NF
+          </div>
+          <div>
+            <div className="text-sm font-medium">Operations Admin</div>
+            <div className="text-xs text-muted-foreground">Monitoring</div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
