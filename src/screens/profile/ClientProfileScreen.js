@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   Bell,
   ChevronRight,
@@ -28,6 +28,8 @@ const font = {
   bold: "Inter_700Bold",
   extra: "Inter_800ExtraBold"
 };
+
+const addressNameSuggestions = ["Uy", "Ofis", "Ish", "Ota-ona uyi"];
 
 export function ClientProfileScreen({ navigation, route }) {
   const session = useAuthStore((state) => state.session);
@@ -155,7 +157,7 @@ export function ClientProfileScreen({ navigation, route }) {
     setAddressFormMode("create");
     setEditingAddressId(null);
     setAddressDraft(makeEmptyAddressDraft());
-    openAddressPicker();
+    setAddressModalOpen(true);
   }
 
   function handleEditAddressPress(address) {
@@ -180,11 +182,10 @@ export function ClientProfileScreen({ navigation, route }) {
   }
 
   async function handleSaveAddress() {
-    const cleanAddress = addressDraft.address.trim();
     const cleanTitle = addressDraft.title.trim() || `Manzil ${savedAddresses.length + 1}`;
 
-    if (cleanAddress.length < 5) {
-      Alert.alert("Manzil kerak", "Uy, ko'cha yoki mo'ljalni kiriting.");
+    if (cleanTitle.length < 2) {
+      Alert.alert("Nom kerak", "Masalan: Uy, Ofis yoki Ish deb yozing.");
       return;
     }
 
@@ -196,7 +197,7 @@ export function ClientProfileScreen({ navigation, route }) {
     setSavingAddress(true);
     const payload = {
       title: cleanTitle,
-      address: cleanAddress,
+      address: cleanTitle,
       ...(typeof addressDraft.latitude === "number" && typeof addressDraft.longitude === "number"
         ? {
             lat: addressDraft.latitude,
@@ -235,7 +236,7 @@ export function ClientProfileScreen({ navigation, route }) {
 
   async function handleSetDefaultAddress(addressId) {
     const result = await updateAddress(addressId, { isDefault: true });
-    if (!result.ok) Alert.alert("Default manzil saqlanmadi", result.message || "Qayta urinib ko'ring.");
+    if (!result.ok) Alert.alert("Asosiy manzil saqlanmadi", result.message || "Qayta urinib ko'ring.");
   }
 
   return (
@@ -425,7 +426,7 @@ function AddressManager({ addresses, loading, saving, error, onAdd, onEdit, onDe
       {!loading && !error && !addresses.length ? (
         <View style={styles.addressEmpty}>
           <Text style={styles.addressEmptyTitle}>Manzillar yo'q</Text>
-          <Text style={styles.addressEmptyText}>Xaritadan nuqta tanlab, birinchi manzilingizni qo'shing.</Text>
+          <Text style={styles.addressEmptyText}>Manzil nomini yozing va xaritadan nuqtani tanlang.</Text>
         </View>
       ) : null}
       {addresses.map((address) => (
@@ -438,13 +439,15 @@ function AddressManager({ addresses, loading, saving, error, onAdd, onEdit, onDe
               <Text style={styles.addressLabel}>{address.title || address.label || "Manzil"}</Text>
               {address.isDefault ? (
                 <View style={styles.defaultBadge}>
-                  <Text style={styles.defaultBadgeText}>Default</Text>
+                  <Text style={styles.defaultBadgeText}>Asosiy</Text>
                 </View>
               ) : null}
             </View>
-            <Text style={styles.addressText} numberOfLines={2}>
-              {address.addressText || address.address}
-            </Text>
+            {(address.addressText || address.address) && (address.addressText || address.address) !== (address.title || address.label) ? (
+              <Text style={styles.addressText} numberOfLines={2}>
+                {address.addressText || address.address}
+              </Text>
+            ) : null}
             <Text style={styles.addressDistrict}>
               {typeof address.lat === "number" && typeof address.lng === "number"
                 ? `${address.lat.toFixed(6)}, ${address.lng.toFixed(6)}`
@@ -471,7 +474,7 @@ function AddressManager({ addresses, loading, saving, error, onAdd, onEdit, onDe
                   style={styles.addressTextButton}
                 >
                   <Check size={13} color="#16A34A" strokeWidth={2.8} />
-                  <Text style={[styles.addressTextButtonLabel, styles.addressDefaultText]}>Default</Text>
+                  <Text style={[styles.addressTextButtonLabel, styles.addressDefaultText]}>Asosiy qilish</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -494,25 +497,40 @@ function AddressManager({ addresses, loading, saving, error, onAdd, onEdit, onDe
 function AddressFormModal({ visible, draft, saving, mode, onChange, onClose, onPickLocation, onSave }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(event) => event.stopPropagation()}>
+      <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
+        <Pressable
+          style={styles.modalSheet}
+          onPress={(event) => {
+            event.stopPropagation();
+            Keyboard.dismiss();
+          }}
+        >
           <Text style={styles.modalTitle}>{mode === "edit" ? "Manzilni tahrirlash" : "Yangi manzil"}</Text>
+          <Text style={styles.modalHint}>Faqat manzil nomini kiriting. Lokatsiyani xaritadan tanlang.</Text>
           <TextInput
             value={draft.title}
             onChangeText={(title) => onChange((current) => ({ ...current, title }))}
-            placeholder="Nom: Uy, Ish, Ofis"
+            placeholder="Uy, Ofis, Ish..."
             placeholderTextColor="#A0A7B3"
             style={styles.modalInput}
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={Keyboard.dismiss}
           />
-          <TextInput
-            multiline
-            value={draft.address}
-            onChangeText={(address) => onChange((current) => ({ ...current, address }))}
-            placeholder="Ko'cha, uy, mo'ljal"
-            placeholderTextColor="#A0A7B3"
-            style={[styles.modalInput, styles.modalTextarea]}
-            textAlignVertical="top"
-          />
+          <View style={styles.addressSuggestionRow}>
+            {addressNameSuggestions.map((name) => (
+              <Pressable
+                key={name}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  onChange((current) => ({ ...current, title: name }));
+                }}
+                style={[styles.addressSuggestionChip, draft.title === name && styles.addressSuggestionChipActive]}
+              >
+                <Text style={[styles.addressSuggestionText, draft.title === name && styles.addressSuggestionTextActive]}>{name}</Text>
+              </Pressable>
+            ))}
+          </View>
           <View style={styles.coordinateBox}>
             <Text style={styles.coordinateLabel}>Xaritadan tanlangan koordinata</Text>
             <Text style={styles.coordinateText}>
@@ -535,7 +553,7 @@ function AddressFormModal({ visible, draft, saving, mode, onChange, onClose, onP
             <View style={[styles.defaultToggleBox, draft.isDefault && styles.defaultToggleBoxActive]}>
               {draft.isDefault ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
             </View>
-            <Text style={[styles.defaultToggleText, draft.isDefault && styles.defaultToggleTextActive]}>Default manzil qilish</Text>
+            <Text style={[styles.defaultToggleText, draft.isDefault && styles.defaultToggleTextActive]}>Asosiy manzil qilish</Text>
           </Pressable>
           <View style={styles.modalActions}>
             <Pressable onPress={onClose} disabled={saving} style={styles.modalCancelButton}>
@@ -560,9 +578,9 @@ const styles = StyleSheet.create({
     paddingBottom: 112
   },
   hero: {
-    minHeight: 142,
-    paddingTop: 58,
-    paddingHorizontal: 24,
+    minHeight: 92,
+    paddingTop: 18,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between"
@@ -570,12 +588,12 @@ const styles = StyleSheet.create({
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13
+    gap: 10
   },
   logoIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#1597A9",
     alignItems: "center",
     justifyContent: "center",
@@ -587,17 +605,17 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: "#273248",
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 29,
     fontFamily: font.extra
   },
   logoAccent: {
     color: "#2CD8A5"
   },
   notificationButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -609,15 +627,15 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginHorizontal: 24,
+    marginHorizontal: 18,
     backgroundColor: "#DCECF3"
   },
   sectionTitle: {
-    marginTop: 36,
-    marginHorizontal: 24,
+    marginTop: 20,
+    marginHorizontal: 18,
     color: "#273248",
-    fontSize: 22,
-    lineHeight: 27,
+    fontSize: 18,
+    lineHeight: 23,
     fontFamily: font.extra
   },
   paymentRow: {
@@ -627,30 +645,30 @@ const styles = StyleSheet.create({
     gap: 14
   },
   paymentEmpty: {
-    marginTop: 20,
-    marginHorizontal: 24,
-    borderRadius: 22,
+    marginTop: 10,
+    marginHorizontal: 18,
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5EEF3",
-    padding: 18,
-    gap: 10
+    padding: 14,
+    gap: 8
   },
   paymentEmptyTitle: {
     color: "#273248",
-    fontSize: 17,
+    fontSize: 15,
     fontFamily: font.extra
   },
   paymentEmptyText: {
     color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
     fontFamily: font.semi
   },
   addCard: {
-    width: 132,
-    height: 88,
-    borderRadius: 18,
+    width: 116,
+    height: 64,
+    borderRadius: 15,
     borderWidth: 1.5,
     borderStyle: "dashed",
     borderColor: "#C7D2DE",
@@ -661,7 +679,7 @@ const styles = StyleSheet.create({
   },
   addCardText: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: font.bold
   },
   bankCard: {
@@ -708,9 +726,9 @@ const styles = StyleSheet.create({
     fontFamily: font.extra
   },
   settingsCard: {
-    marginTop: 20,
-    marginHorizontal: 24,
-    borderRadius: 26,
+    marginTop: 10,
+    marginHorizontal: 18,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
     overflow: "hidden",
     shadowColor: "#0F719D",
@@ -720,22 +738,22 @@ const styles = StyleSheet.create({
     elevation: 5
   },
   settingRow: {
-    minHeight: 82,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
+    minHeight: 64,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: "#EEF3F7",
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 15
+    gap: 11
   },
   settingRowPressed: {
     backgroundColor: "#F8FCFE"
   },
   settingIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -743,7 +761,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   settingTop: {
-    minHeight: 50,
+    minHeight: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between"
@@ -753,22 +771,22 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     color: "#273248",
-    fontSize: 20,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 21,
     fontFamily: font.extra
   },
   settingSubtitle: {
-    marginTop: 4,
+    marginTop: 2,
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 12,
     fontFamily: font.medium
   },
   chevronOpen: {
     transform: [{ rotate: "90deg" }]
   },
   personalDetails: {
-    marginTop: 4,
-    gap: 8
+    marginTop: 2,
+    gap: 7
   },
   detailText: {
     color: "#6B7280",
@@ -777,20 +795,20 @@ const styles = StyleSheet.create({
     fontFamily: font.semi
   },
   profileInput: {
-    minHeight: 44,
-    borderRadius: 14,
+    minHeight: 40,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#DCECF3",
     backgroundColor: "#F8FCFE",
     paddingHorizontal: 12,
     color: "#273248",
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: font.semi
   },
   saveProfileButton: {
     alignSelf: "flex-start",
-    minHeight: 38,
-    borderRadius: 14,
+    minHeight: 34,
+    borderRadius: 12,
     backgroundColor: "#0F80B7",
     alignItems: "center",
     justifyContent: "center",
@@ -828,33 +846,33 @@ const styles = StyleSheet.create({
     color: "#FFFFFF"
   },
   logoutRow: {
-    minHeight: 76,
-    paddingHorizontal: 18,
+    minHeight: 62,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 15
   },
   logoutIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#FEECEC",
     alignItems: "center",
     justifyContent: "center"
   },
   logoutText: {
     color: "#EF4444",
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: font.extra
   },
   addressManager: {
-    marginTop: 8,
-    gap: 10
+    marginTop: 6,
+    gap: 8
   },
   addAddressButton: {
     alignSelf: "flex-start",
-    minHeight: 42,
-    borderRadius: 15,
+    minHeight: 38,
+    borderRadius: 13,
     backgroundColor: "#0F80B7",
     paddingHorizontal: 14,
     flexDirection: "row",
@@ -923,21 +941,21 @@ const styles = StyleSheet.create({
     fontFamily: font.medium
   },
   addressItem: {
-    minHeight: 72,
-    borderRadius: 17,
+    minHeight: 64,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: "#E5EEF3",
     backgroundColor: "#F8FCFE",
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     flexDirection: "row",
     alignItems: "center",
     gap: 11
   },
   addressPin: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#EAF8FC",
     alignItems: "center",
     justifyContent: "center"
@@ -953,7 +971,7 @@ const styles = StyleSheet.create({
   addressLabel: {
     flexShrink: 1,
     color: "#273248",
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: font.extra
   },
   defaultBadge: {
@@ -970,8 +988,8 @@ const styles = StyleSheet.create({
   addressText: {
     marginTop: 3,
     color: "#6B7280",
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     fontFamily: font.semi
   },
   addressDistrict: {
@@ -981,14 +999,14 @@ const styles = StyleSheet.create({
     fontFamily: font.extra
   },
   addressActionsRow: {
-    marginTop: 8,
+    marginTop: 6,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
   },
   addressTextButton: {
-    minHeight: 30,
-    borderRadius: 11,
+    minHeight: 28,
+    borderRadius: 10,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5EEF3",
@@ -1006,9 +1024,9 @@ const styles = StyleSheet.create({
     color: "#16A34A"
   },
   deleteAddressButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center"
@@ -1020,20 +1038,26 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     marginHorizontal: 16,
-    marginBottom: 26,
-    borderRadius: 24,
+    marginBottom: 22,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
-    padding: 18,
-    gap: 12
+    padding: 16,
+    gap: 10
   },
   modalTitle: {
     color: "#273248",
-    fontSize: 21,
+    fontSize: 19,
     fontFamily: font.extra
   },
+  modalHint: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: font.semi
+  },
   modalInput: {
-    minHeight: 48,
-    borderRadius: 15,
+    minHeight: 46,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DCECF3",
     backgroundColor: "#F8FCFE",
@@ -1042,17 +1066,40 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: font.semi
   },
-  modalTextarea: {
-    minHeight: 86,
-    paddingTop: 13
+  addressSuggestionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  addressSuggestionChip: {
+    minHeight: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#DCECF3",
+    backgroundColor: "#F8FCFE",
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  addressSuggestionChipActive: {
+    borderColor: "#0F80B7",
+    backgroundColor: "#EAF8FC"
+  },
+  addressSuggestionText: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontFamily: font.extra
+  },
+  addressSuggestionTextActive: {
+    color: "#0F80B7"
   },
   coordinateBox: {
-    borderRadius: 15,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DCECF3",
     backgroundColor: "#F8FCFE",
     paddingHorizontal: 13,
-    paddingVertical: 11
+    paddingVertical: 10
   },
   coordinateLabel: {
     color: "#6B7280",
@@ -1062,12 +1109,12 @@ const styles = StyleSheet.create({
   coordinateText: {
     marginTop: 4,
     color: "#273248",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: font.extra
   },
   pickLocationButton: {
-    minHeight: 44,
-    borderRadius: 15,
+    minHeight: 42,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#CFE8F0",
     backgroundColor: "#EAF8FC",
@@ -1083,8 +1130,8 @@ const styles = StyleSheet.create({
     fontFamily: font.extra
   },
   defaultToggle: {
-    minHeight: 44,
-    borderRadius: 15,
+    minHeight: 42,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DCECF3",
     backgroundColor: "#F8FCFE",
@@ -1124,8 +1171,8 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     flex: 1,
-    minHeight: 48,
-    borderRadius: 15,
+    minHeight: 44,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#DCECF3",
     alignItems: "center",
@@ -1138,8 +1185,8 @@ const styles = StyleSheet.create({
   },
   modalSaveButton: {
     flex: 1,
-    minHeight: 48,
-    borderRadius: 15,
+    minHeight: 44,
+    borderRadius: 14,
     backgroundColor: "#2CD8A5",
     alignItems: "center",
     justifyContent: "center"

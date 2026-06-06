@@ -7,11 +7,11 @@ import { useAuthStore } from "../../store/authStore";
 import { colors, iconSizes, radius } from "../../theme";
 
 const tabMeta = {
-  [ROUTES.WORKER_DASHBOARD_TAB]: { label: "Home", icon: Home },
-  [ROUTES.WORKER_JOBS_TAB]: { label: "Jobs", icon: BriefcaseBusiness },
+  [ROUTES.WORKER_DASHBOARD_TAB]: { label: "Bosh", icon: Home },
+  [ROUTES.WORKER_JOBS_TAB]: { label: "Ishlar", icon: BriefcaseBusiness },
   [ROUTES.WORKER_CHATS_TAB]: { label: "Chat", icon: MessageCircle },
-  [ROUTES.WORKER_EARNINGS_TAB]: { label: "Earn", icon: DollarSign },
-  [ROUTES.WORKER_PROFILE_TAB]: { label: "Profile", icon: UserRound }
+  [ROUTES.WORKER_EARNINGS_TAB]: { label: "Daromad", icon: DollarSign },
+  [ROUTES.WORKER_PROFILE_TAB]: { label: "Profil", icon: UserRound }
 };
 
 export function WorkerTabBar({ state, descriptors, navigation }) {

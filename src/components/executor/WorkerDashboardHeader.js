@@ -14,7 +14,7 @@ export function WorkerDashboardHeader({ workerName }) {
   return (
     <View style={styles.header}>
       <View style={styles.nameBlock}>
-        <Text style={styles.caption}>Good morning,</Text>
+        <Text style={styles.caption}>Xayrli tong,</Text>
         <Text style={styles.name}>{workerName}</Text>
       </View>
       <View style={styles.avatar}>

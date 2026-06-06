@@ -29,6 +29,35 @@ function isActiveWorkerOrder(order) {
   return activeWorkerStatuses.includes(resolveOrderStatusKey(order));
 }
 
+function workerOrderErrorMessage(result, fallback) {
+  switch (result?.code) {
+    case "ORDER_RESPONSE_EXPIRED":
+      return "Buyurtmani qabul qilish muddati tugagan. Ro'yxat yangilanmoqda.";
+    case "ORDER_ALREADY_ACCEPTED":
+    case "ORDER_STATUS_CONFLICT":
+      return "Bu buyurtma holati allaqachon o'zgargan. Ro'yxat yangilanmoqda.";
+    case "ORDER_NOT_FOUND":
+      return "Buyurtma topilmadi. Ro'yxat yangilanmoqda.";
+    case "ORDER_NOT_ASSIGNED":
+      return "Bu buyurtma sizga biriktirilmagan.";
+    case "WORKER_NOT_AVAILABLE":
+      return "Siz hozir yangi buyurtma qabul qila olmaysiz. Statusingizni tekshiring.";
+    case "PROVIDER_OR_ADMIN_REQUIRED":
+    case "PROVIDER_REQUIRED":
+    case "FORBIDDEN":
+      return "Buyurtmani qabul qilish uchun usta akkaunti bilan kiring.";
+    case "ACCESS_TOKEN_EXPIRED":
+    case "SESSION_INVALID":
+      return "Sessiya muddati tugagan. Qayta tizimga kiring.";
+    default:
+      return result?.message || fallback;
+  }
+}
+
+function shouldRemoveIncomingRequest(result) {
+  return ["ORDER_RESPONSE_EXPIRED", "ORDER_ALREADY_ACCEPTED", "ORDER_STATUS_CONFLICT", "ORDER_NOT_FOUND"].includes(result?.code);
+}
+
 export const useWorkerStore = create((set, get) => ({
   workerProfile: null,
   incomingRequests: [],
@@ -53,7 +82,7 @@ export const useWorkerStore = create((set, get) => ({
   },
   syncWorkerFromApi: async () => {
     const token = useAuthStore.getState().session?.token;
-    if (!token) return { ok: false, message: "No API session token" };
+    if (!token) return { ok: false, message: "API sessiya tokeni topilmadi." };
 
     const [profileResult, incomingResult, ordersResult, earningsResult, transactionsResult] = await Promise.all([
       fetchWorkerMeApi(token),
@@ -135,34 +164,45 @@ export const useWorkerStore = create((set, get) => ({
   acceptIncomingRequest: async (requestId) => {
     const token = useAuthStore.getState().session?.token;
 
-    if (token) {
-      const result = await acceptOrderApi(token, requestId);
-      if (result.ok) {
-        set((state) => ({
-          incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId),
-          operationalStatus: WORKER_STATUS.BUSY,
-          workerProfile: {
-            ...state.workerProfile,
-            availability: WORKER_STATUS.BUSY
-          },
-          activeJob: {
-            ...result.order,
-            problemTitle: result.order.title,
-            service: result.order.service,
-            clientName: result.order.clientName || "Mijoz",
-            address: result.order.address,
-            estimatedPayment: result.order.amount
-          },
-          apiStatus: {
-            source: "api",
-            lastError: null
-          }
-        }));
-        return result;
-      }
+    if (!token) {
+      return { ok: false, message: "Buyurtmani qabul qilish uchun tizimga kiring." };
     }
 
-    return { ok: false, message: "Buyurtmani qabul qilish uchun tizimga kiring." };
+    const result = await acceptOrderApi(token, requestId);
+    if (result.ok) {
+      set((state) => ({
+        incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId),
+        operationalStatus: WORKER_STATUS.BUSY,
+        workerProfile: {
+          ...state.workerProfile,
+          availability: WORKER_STATUS.BUSY
+        },
+        activeJob: {
+          ...result.order,
+          problemTitle: result.order.title,
+          service: result.order.service,
+          clientName: result.order.clientName || "Mijoz",
+          address: result.order.address,
+          estimatedPayment: result.order.amount
+        },
+        apiStatus: {
+          source: "api",
+          lastError: null
+        }
+      }));
+      return result;
+    }
+
+    if (shouldRemoveIncomingRequest(result)) {
+      set((state) => ({
+        incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId)
+      }));
+    }
+
+    return {
+      ...result,
+      message: workerOrderErrorMessage(result, "Buyurtmani qabul qilib bo'lmadi. Qayta urinib ko'ring.")
+    };
   },
   rejectIncomingRequest: async (requestId) => {
     const token = useAuthStore.getState().session?.token;

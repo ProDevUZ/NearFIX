@@ -19,9 +19,9 @@ export function WorkerStatusCard({ status, activeJob, onChangeStatus }) {
           <Zap size={24} color={colors.white} fill={colors.white} strokeWidth={2.6} />
         </View>
         <View style={styles.body}>
-          <Text style={styles.title}>{online ? "You are Online" : activeJob ? "You are Busy" : "You are Offline"}</Text>
+          <Text style={styles.title}>{online ? "Onlaynsiz" : activeJob ? "Bandsiz" : "Oflaynsiz"}</Text>
           <Text style={styles.text}>
-            {online ? "Receiving new job requests" : activeJob ? "Finish your active job before new requests" : copy.helper}
+            {online ? "Yangi buyurtmalar qabul qilinyapti" : activeJob ? "Yangi buyurtmalar uchun avval faol ishni yakunlang" : copy.helper}
           </Text>
         </View>
         <Pressable

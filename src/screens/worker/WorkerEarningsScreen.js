@@ -37,8 +37,8 @@ export function WorkerEarningsScreen() {
       const palette = avatarPalette[index % avatarPalette.length];
       return {
         id: transaction.id,
-        title: transaction.clientName || transaction.publicCode || "Order",
-        subtitle: `${transaction.service || "Service"} - ${formatDate(transaction.createdAt)}`,
+        title: transaction.clientName || transaction.publicCode || "Buyurtma",
+        subtitle: `${transaction.service || "Xizmat"} - ${formatDate(transaction.createdAt)}`,
         amount: formatPositiveAmount(transaction.netAmount || transaction.amount),
         positive: true,
         avatar: getInitials(transaction.clientName || transaction.publicCode || "NF"),
@@ -49,7 +49,7 @@ export function WorkerEarningsScreen() {
   }, [transactions]);
 
   const selectedTotal = range === "today" ? earnings.todayEarnings : range === "month" ? earnings.monthEarnings : earnings.weekEarnings;
-  const summaryLabel = range === "today" ? "TODAY'S EARNINGS" : range === "month" ? "MONTH'S EARNINGS" : "WEEK'S EARNINGS";
+  const summaryLabel = range === "today" ? "BUGUNGI DAROMAD" : range === "month" ? "OYLIK DAROMAD" : "HAFTALIK DAROMAD";
   const jobs = earnings.completedJobs || 0;
   const avgDay = earnings.averagePerDay || 0;
   const hasEarningsData = Boolean(selectedTotal || jobs || visibleTransactions.length);
@@ -62,14 +62,14 @@ export function WorkerEarningsScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#1F1E42" colors={["#1F1E42"]} />}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Earnings</Text>
-        <Text style={styles.subtitle}>May 2026 - Payout every Monday</Text>
+        <Text style={styles.title}>Daromad</Text>
+        <Text style={styles.subtitle}>May 2026 - to'lov har dushanba</Text>
       </View>
 
       <View style={styles.segment}>
-        <RangeButton label="Today" active={range === "today"} onPress={() => setRange("today")} />
-        <RangeButton label="This Week" active={range === "week"} onPress={() => setRange("week")} />
-        <RangeButton label="This Month" active={range === "month"} onPress={() => setRange("month")} />
+        <RangeButton label="Bugun" active={range === "today"} onPress={() => setRange("today")} />
+        <RangeButton label="Bu hafta" active={range === "week"} onPress={() => setRange("week")} />
+        <RangeButton label="Bu oy" active={range === "month"} onPress={() => setRange("month")} />
       </View>
 
       <View style={styles.summaryCard}>
@@ -87,15 +87,15 @@ export function WorkerEarningsScreen() {
         </View>
 
         <View style={styles.summaryStats}>
-          <SummaryMetric icon={DollarSign} label="Jobs" value={jobs} />
+          <SummaryMetric icon={DollarSign} label="Ishlar" value={jobs} />
           <View style={styles.summaryDivider} />
-          <SummaryMetric icon={CalendarDays} label="Avg/day" value={formatCurrency(avgDay)} />
+          <SummaryMetric icon={CalendarDays} label="Kunlik o'rtacha" value={formatCurrency(avgDay)} />
         </View>
       </View>
 
       <View style={styles.chartCard}>
         <View style={styles.chartHeader}>
-          <Text style={styles.cardTitle}>Revenue Trend</Text>
+          <Text style={styles.cardTitle}>Daromad dinamikasi</Text>
           <View style={styles.growthPillLight}>
             <ArrowUpRight size={12} color="#18A850" strokeWidth={2.5} />
             <Text style={styles.growthTextLight}>{earnings.growthPercentage || 0}%</Text>
@@ -105,9 +105,9 @@ export function WorkerEarningsScreen() {
       </View>
 
       <View style={styles.transactionsHeader}>
-        <Text style={styles.transactionsTitle}>Transactions</Text>
+        <Text style={styles.transactionsTitle}>Tranzaksiyalar</Text>
         <Pressable style={({ pressed }) => pressed && styles.pressed}>
-          <Text style={styles.viewAll}>View all</Text>
+          <Text style={styles.viewAll}>Barchasi</Text>
         </Pressable>
       </View>
 
@@ -238,8 +238,8 @@ function formatDate(value) {
 function EmptyState() {
   return (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No earnings data</Text>
-      <Text style={styles.emptyText}>Completed paid jobs will appear here.</Text>
+      <Text style={styles.emptyTitle}>Daromad ma'lumoti yo'q</Text>
+      <Text style={styles.emptyText}>Yakunlangan pullik ishlar shu yerda ko'rinadi.</Text>
     </View>
   );
 }

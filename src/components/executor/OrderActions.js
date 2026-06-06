@@ -7,17 +7,17 @@ import { colors, iconSizes, radius } from "../../theme";
 const nextActionByStatus = {
   [TRACKING_STATUSES.ACCEPTED]: {
     status: TRACKING_STATUSES.ON_THE_WAY,
-    label: "Start Route",
+    label: "Yo'lga chiqish",
     icon: Navigation
   },
   [TRACKING_STATUSES.ON_THE_WAY]: {
     status: TRACKING_STATUSES.IN_PROGRESS,
-    label: "Start Job",
+    label: "Ishni boshlash",
     icon: Wrench
   },
   [TRACKING_STATUSES.IN_PROGRESS]: {
     status: TRACKING_STATUSES.COMPLETED,
-    label: "Complete Job",
+    label: "Ishni yakunlash",
     icon: CheckCircle2
   }
 };
@@ -57,7 +57,7 @@ export function OrderActions({ currentStatus, onUpdateStatus, onComplete }) {
           </Pressable>
         ) : (
           <View style={styles.idleAction}>
-            <Text style={styles.idleText}>Status up to date</Text>
+            <Text style={styles.idleText}>Status yangilangan</Text>
           </View>
         )}
       </View>

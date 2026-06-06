@@ -30,8 +30,8 @@ function resolvePrivateRoom(room, currentUserId, index) {
   return {
     ...room,
     title,
-    subtitle: room.subtitle || room.serviceType || "Order conversation",
-    time: room.time || "now",
+    subtitle: room.subtitle || room.serviceType || "Buyurtma suhbati",
+    time: room.time || "hozir",
     avatarBg: palette.avatarBg,
     avatarColor: palette.avatarColor,
     online: Boolean(room.online),
@@ -120,8 +120,8 @@ export function ChatScreen({ navigation }) {
     <View style={styles.screen}>
       <View style={styles.contentHeader}>
         <View>
-          <Text style={styles.title}>Messages</Text>
-          <Text style={styles.subtitle}>{unreadCount} unread conversations</Text>
+          <Text style={styles.title}>Xabarlar</Text>
+          <Text style={styles.subtitle}>{unreadCount} ta o'qilmagan suhbat</Text>
         </View>
         <Pressable style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
           <MoreVertical size={20} color="#1F385E" strokeWidth={2.3} />
@@ -133,7 +133,7 @@ export function ChatScreen({ navigation }) {
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search conversations..."
+          placeholder="Suhbatlarni qidirish..."
           placeholderTextColor="#8EA1BA"
           style={styles.searchInput}
         />
@@ -148,8 +148,8 @@ export function ChatScreen({ navigation }) {
           filteredRooms.map((room, index) => <ChatRow key={room.id} room={room} index={index} onPress={() => openThread(room)} />)
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Conversation not found</Text>
-            <Text style={styles.emptyText}>Try another name.</Text>
+            <Text style={styles.emptyTitle}>Suhbat topilmadi</Text>
+            <Text style={styles.emptyText}>Boshqa nom bilan qidirib ko'ring.</Text>
           </View>
         )}
       </ScrollView>

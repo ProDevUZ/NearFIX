@@ -9,14 +9,14 @@ function mapAvailability(status) {
 }
 
 function formatRequestAge(createdAt) {
-  if (!createdAt) return "Now";
+  if (!createdAt) return "Hozir";
 
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
-  if (minutes < 1) return "Now";
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return "Hozir";
+  if (minutes < 60) return `${minutes} daqiqa oldin`;
 
   const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return `${hours} soat oldin`;
 }
 
 export function mapApiWorkerProfile(worker) {
@@ -132,6 +132,7 @@ export async function fetchIncomingOrdersApi(token) {
         urgency: order.urgency === "URGENT" ? "Shoshilinch" : order.urgency === "NORMAL" ? "Oddiy" : "Tez",
         estimatedPayment: order.priceEstimate ? `${Number(order.priceEstimate).toLocaleString("uz-UZ")} so'm` : "Kelishiladi",
         createdAt: formatRequestAge(order.createdAt),
+        responseDeadlineAt: order.responseDeadlineAt ? new Date(order.responseDeadlineAt).getTime() : undefined,
         mediaCount: 0,
         statusKey: TRACKING_STATUSES.REQUEST_SENT,
         rawOrder: order

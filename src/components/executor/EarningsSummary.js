@@ -14,7 +14,7 @@ export function EarningsSummary({ earnings, worker }) {
     <View style={styles.card}>
       <View style={styles.orbLarge} />
       <View style={styles.orbSmall} />
-      <Text style={styles.eyebrow}>TODAY'S EARNINGS</Text>
+      <Text style={styles.eyebrow}>BUGUNGI DAROMAD</Text>
       <View style={styles.amountRow}>
         <Text style={styles.amount}>{today}</Text>
         <View style={styles.deltaPill}>
@@ -22,9 +22,9 @@ export function EarningsSummary({ earnings, worker }) {
         </View>
       </View>
       <View style={styles.statsRow}>
-        <Metric label="Jobs Done" value={completedJobs} />
-        <Metric label="Hours Active" value={hoursWorked} bordered />
-        <Metric label="Rating" value={rating} rating bordered />
+        <Metric label="Yakunlangan" value={completedJobs} />
+        <Metric label="Faol soat" value={hoursWorked} bordered />
+        <Metric label="Reyting" value={rating} rating bordered />
       </View>
     </View>
   );

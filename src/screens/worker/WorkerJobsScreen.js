@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ArrowRight, CheckCircle2, Clock3, MapPin, SlidersHorizontal, Star } from "lucide-react-native";
 import { ActiveJobCard } from "../../components/executor/ActiveJobCard";
+import { OrderResponseTimer } from "../../components/executor/OrderResponseTimer";
 import { ROUTES } from "../../constants/routes";
 import { ensureOrderChatRoomApi } from "../../services/chats/chatService";
 import { useAuthStore } from "../../store/authStore";
@@ -68,24 +69,24 @@ export function WorkerJobsScreen({ navigation }) {
     }
 
     if (!result?.ok) {
-      Alert.alert("Job not accepted", result?.message || "Please try again.");
+      Alert.alert("Buyurtma qabul qilinmadi", result?.message || "Qayta urinib ko'ring.");
     }
   }
 
   async function handleComplete() {
     const result = await completeActiveJob();
     if (result?.ok) {
-      Alert.alert("Job completed", "You are available for the next request.");
+      Alert.alert("Ish yakunlandi", "Keyingi buyurtma uchun tayyorsiz.");
       return;
     }
 
-    Alert.alert("Status not updated", result?.message || "Please try again.");
+    Alert.alert("Status yangilanmadi", result?.message || "Qayta urinib ko'ring.");
   }
 
   async function handleUpdateStatus(nextStatus) {
     const result = await updateActiveJobStatus(nextStatus);
     if (!result?.ok) {
-      Alert.alert("Status not updated", result?.message || "Please try again.");
+      Alert.alert("Status yangilanmadi", result?.message || "Qayta urinib ko'ring.");
     }
   }
 
@@ -101,7 +102,7 @@ export function WorkerJobsScreen({ navigation }) {
       return;
     }
 
-    Alert.alert("Chat unavailable", result.message || "Could not open chat with this customer.");
+    Alert.alert("Chat ochilmadi", result.message || "Mijoz bilan chatni ochib bo'lmadi.");
   }
 
   return (
@@ -112,29 +113,29 @@ export function WorkerJobsScreen({ navigation }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#1F1E42" colors={["#1F1E42"]} />}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Jobs</Text>
-        <Text style={styles.subtitle}>Manage your work orders</Text>
+        <Text style={styles.title}>Ishlar</Text>
+        <Text style={styles.subtitle}>Ish buyurtmalarini boshqaring</Text>
       </View>
 
       <View style={styles.segment}>
         <SegmentButton
           active={selectedTab === "new"}
           icon={SlidersHorizontal}
-          label="New"
+          label="Yangi"
           count={newJobs.length}
           onPress={() => setSelectedTab("new")}
         />
         <SegmentButton
           active={selectedTab === "active"}
           icon={Clock3}
-          label="Active"
+          label="Faol"
           count={activeJobs.length}
           onPress={() => setSelectedTab("active")}
         />
         <SegmentButton
           active={selectedTab === "done"}
           icon={CheckCircle2}
-          label="Done"
+          label="Tugagan"
           count={doneJobs.length}
           onPress={() => setSelectedTab("done")}
         />
@@ -143,7 +144,14 @@ export function WorkerJobsScreen({ navigation }) {
       <View style={styles.list}>
         {selectedTab === "new"
           ? newJobs.map((job, index) => (
-              <JobCard key={job.id} job={job} disabled={!canAccept && incomingRequests.length > 0} onAccept={() => handleAccept(job)} index={index} />
+              <JobCard
+                key={job.id}
+                job={job}
+                disabled={!canAccept && incomingRequests.length > 0}
+                onAccept={() => handleAccept(job)}
+                index={index}
+                showResponseTimer
+              />
             ))
           : null}
 
@@ -154,21 +162,21 @@ export function WorkerJobsScreen({ navigation }) {
                 key={job.id}
                 job={job}
                 onChat={handleOpenJobChat}
-                onNavigate={() => Alert.alert("Navigation", job.address || "Job address is not available.")}
+                onNavigate={() => Alert.alert("Yo'nalish", job.address || "Buyurtma manzili mavjud emas.")}
                 onUpdateStatus={handleUpdateStatus}
                 onComplete={handleComplete}
               />
             ))
           ) : (
-            <EmptyPanel title="No active job" text="Accepted jobs will appear here." />
+            <EmptyPanel title="Faol ish yo'q" text="Qabul qilingan ishlar shu yerda ko'rinadi." />
           )
         ) : null}
 
         {selectedTab === "done" ? (
           doneJobs.length ? (
-            doneJobs.map((job, index) => <JobCard key={job.id} job={job} index={index} statusLabel="Done" disabled />)
+            doneJobs.map((job, index) => <JobCard key={job.id} job={job} index={index} statusLabel="Tugagan" disabled />)
           ) : (
-            <EmptyPanel title="No completed jobs" text="Finished work orders will appear here." />
+            <EmptyPanel title="Yakunlangan ishlar yo'q" text="Yakunlangan buyurtmalar shu yerda ko'rinadi." />
           )
         ) : null}
       </View>
@@ -188,8 +196,18 @@ function SegmentButton({ active, icon: Icon, label, count, onPress }) {
   );
 }
 
-function JobCard({ job, disabled, onAccept, index = 0, statusLabel = "New", actionLabel = "Accept", footerActionLabel, onFooterAction }) {
-  const clientName = job.clientName || "Customer";
+function JobCard({
+  job,
+  disabled,
+  onAccept,
+  index = 0,
+  statusLabel = "Yangi",
+  actionLabel = "Qabul qilish",
+  footerActionLabel,
+  onFooterAction,
+  showResponseTimer = false
+}) {
+  const clientName = job.clientName || "Mijoz";
   const initials = getInitials(clientName);
   const service = job.service || job.problemTitle || job.title;
   const summary = job.problemSummary || job.problemDescription;
@@ -212,7 +230,7 @@ function JobCard({ job, disabled, onAccept, index = 0, statusLabel = "New", acti
             <View style={styles.ratingRow}>
               <Star size={11} color="#FFC331" fill="#FFC331" strokeWidth={2.2} />
               <Text style={styles.ratingText}>
-                {job.rating} - {job.jobs} jobs
+                {job.rating} - {job.jobs} ish
               </Text>
             </View>
           ) : null}
@@ -243,6 +261,8 @@ function JobCard({ job, disabled, onAccept, index = 0, statusLabel = "New", acti
           </Text>
         </View>
       ) : null}
+
+      {showResponseTimer ? <OrderResponseTimer deadlineAt={job.responseDeadlineAt} /> : null}
 
       <View style={styles.cardFooter}>
         <View style={styles.metaGroup}>
@@ -290,7 +310,7 @@ function EmptyPanel({ title, text }) {
 }
 
 function getInitials(name) {
-  return String(name || "Customer")
+  return String(name || "Mijoz")
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)

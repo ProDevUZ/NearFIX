@@ -47,7 +47,7 @@ export function WorkerDashboardScreen({ navigation }) {
   async function handleAccept(requestId) {
     const result = await acceptIncomingRequest(requestId);
     if (result?.ok) {
-      Alert.alert("Buyurtma qabul qilindi", "Siz BUSY holatiga o'tdingiz. Yangi buyurtmalar vaqtincha to'xtatildi.");
+      Alert.alert("Buyurtma qabul qilindi", "Siz band holatiga o'tdingiz. Yangi buyurtmalar vaqtincha to'xtatildi.");
       return;
     }
 
@@ -57,7 +57,7 @@ export function WorkerDashboardScreen({ navigation }) {
   async function handleComplete() {
     const result = await completeActiveJob();
     if (result?.ok) {
-      Alert.alert("Ish yakunlandi", "Status AVAILABLE holatiga qaytdi.");
+      Alert.alert("Ish yakunlandi", "Statusingiz mavjud holatiga qaytdi.");
       return;
     }
 
@@ -87,7 +87,7 @@ export function WorkerDashboardScreen({ navigation }) {
   }
 
   function handleNavigateToJob() {
-    Alert.alert("Navigation", activeJob?.address || "Job address is not available.");
+    Alert.alert("Yo'nalish", activeJob?.address || "Buyurtma manzili mavjud emas.");
   }
 
   async function handleRefresh() {
@@ -110,8 +110,8 @@ export function WorkerDashboardScreen({ navigation }) {
 
       <View style={styles.sectionBlock}>
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Active Job</Text>
-          {activeJob ? <StatusPill label={trackingStatusCopy[activeJob.statusKey]?.title || "Active"} /> : null}
+          <Text style={styles.sectionTitle}>Faol ish</Text>
+          {activeJob ? <StatusPill label={trackingStatusCopy[activeJob.statusKey]?.title || "Faol"} /> : null}
         </View>
         {activeJob ? (
           <ActiveJobCard
@@ -123,14 +123,14 @@ export function WorkerDashboardScreen({ navigation }) {
           />
         ) : (
           <EmptyState
-            title="No active job"
-            text="You are ready for the next request. Accept an incoming job when it appears here."
+            title="Faol ish yo'q"
+            text="Keyingi buyurtmaga tayyorsiz. Yangi buyurtma kelganda shu yerda qabul qiling."
           />
         )}
       </View>
 
       <View style={styles.sectionBlock}>
-        <SectionHeader title="Incoming Requests" action="See all" />
+        <SectionHeader title="Kelgan buyurtmalar" action="Barchasi" />
         <View style={styles.stack}>
           {incomingRequests.length ? (
             incomingRequests.slice(0, 2).map((request, index) => (
@@ -144,7 +144,7 @@ export function WorkerDashboardScreen({ navigation }) {
               />
             ))
           ) : (
-            <EmptyState title="No incoming requests" text="Stay online. New nearby jobs will appear here as soon as customers send them." />
+            <EmptyState title="Kelgan buyurtmalar yo'q" text="Onlayn bo'ling. Mijozlar yuborgan yaqin buyurtmalar shu yerda ko'rinadi." />
           )}
         </View>
       </View>
@@ -170,11 +170,11 @@ function WeeklyPerformanceSummary({ earnings, worker, completedOrders }) {
 
   return (
     <View style={styles.sectionBlock}>
-      <Text style={styles.sectionTitle}>This Week</Text>
+      <Text style={styles.sectionTitle}>Bu hafta</Text>
       <View style={styles.weeklyGrid}>
-        <WeeklyMetric icon="jobs" label="Jobs" value={totalJobs} />
-        <WeeklyMetric icon="earned" label="Earned" value={weekEarnings} />
-        <WeeklyMetric icon="hours" label="Hours" value={hours} />
+        <WeeklyMetric icon="jobs" label="Ishlar" value={totalJobs} />
+        <WeeklyMetric icon="earned" label="Daromad" value={weekEarnings} />
+        <WeeklyMetric icon="hours" label="Soat" value={hours} />
       </View>
     </View>
   );

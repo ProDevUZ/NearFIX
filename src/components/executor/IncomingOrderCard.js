@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowRight } from "lucide-react-native";
 import { colors, iconSizes, radius, shadow } from "../../theme";
+import { OrderResponseTimer } from "./OrderResponseTimer";
 
 const avatarColors = ["#EFE0FF", "#FFD8EB", "#DDEBFF"];
 const textColors = ["#7C3DFF", "#D81B71", "#2868D8"];
@@ -17,39 +18,46 @@ export function IncomingOrderCard({ request, disabled, onAccept, index = 0 }) {
 
   return (
     <View style={[styles.card, disabled && styles.disabled]}>
-      <View style={[styles.clientIcon, { backgroundColor: avatarColors[index % avatarColors.length] }]}>
-        <Text style={[styles.avatarText, { color: textColors[index % textColors.length] }]}>{initials || "JP"}</Text>
+      <View style={styles.topRow}>
+        <View style={[styles.clientIcon, { backgroundColor: avatarColors[index % avatarColors.length] }]}>
+          <Text style={[styles.avatarText, { color: textColors[index % textColors.length] }]}>{initials || "JP"}</Text>
+        </View>
+        <View style={styles.titleBlock}>
+          <Text style={styles.client}>{request.clientName}</Text>
+          <Text style={styles.service} numberOfLines={1}>
+            {request.service || "Xizmat"} - {request.distance || "0.8 km"} - {request.createdAt || "Hozir"}
+          </Text>
+        </View>
+        <Text style={styles.payment}>{request.estimatedPayment}</Text>
+        <Pressable
+          disabled={disabled}
+          onPress={disabled ? undefined : onAccept}
+          style={({ pressed }) => [styles.acceptButton, disabled && styles.acceptDisabled, pressed && styles.pressed]}
+        >
+          <ArrowRight size={iconSizes.sm} color={colors.white} strokeWidth={2.8} />
+        </Pressable>
       </View>
-      <View style={styles.titleBlock}>
-        <Text style={styles.client}>{request.clientName}</Text>
-        <Text style={styles.service} numberOfLines={1}>
-          {request.service || "Service"} - {request.distance || "0.8 km"} - {request.createdAt || "2 min ago"}
-        </Text>
-      </View>
-      <Text style={styles.payment}>{request.estimatedPayment}</Text>
-      <Pressable
-        disabled={disabled}
-        onPress={disabled ? undefined : onAccept}
-        style={({ pressed }) => [styles.acceptButton, disabled && styles.acceptDisabled, pressed && styles.pressed]}
-      >
-        <ArrowRight size={iconSizes.sm} color={colors.white} strokeWidth={2.8} />
-      </Pressable>
+      <OrderResponseTimer deadlineAt={request.responseDeadlineAt} compact />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    minHeight: 66,
+    minHeight: 82,
     borderRadius: 15,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+    ...shadow
+  },
+  topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    ...shadow
+    gap: 11
   },
   disabled: {
     opacity: 0.55

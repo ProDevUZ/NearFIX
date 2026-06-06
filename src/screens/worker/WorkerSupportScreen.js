@@ -13,24 +13,24 @@ export function WorkerSupportScreen() {
 
   async function handleCreateTicket() {
     if (!token) {
-      Alert.alert("Tizimga kiring", "Supportga murojaat qilish uchun qayta tizimga kiring.");
+      Alert.alert("Tizimga kiring", "Yordam bo'limiga murojaat qilish uchun qayta tizimga kiring.");
       return;
     }
 
     const result = await createSupportTicketApi(token, {
       reason: "Operatsion yordam",
-      message: "Worker app support card orqali murojaat yaratildi."
+      message: "Usta ilovasidagi yordam kartasi orqali murojaat yaratildi."
     });
 
     Alert.alert(
       result.ok ? "Murojaat yaratildi" : "Murojaat yuborilmadi",
-      result.ok ? "Support jamoasi murojaatingizni ko'rib chiqadi." : result.message || "Qayta urinib ko'ring."
+      result.ok ? "Yordam jamoasi murojaatingizni ko'rib chiqadi." : result.message || "Qayta urinib ko'ring."
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Header title="Support" />
+      <Header title="Yordam" />
       <WorkerSupportCard onPress={handleCreateTicket} />
       <Card>
         <SectionHeader title="Tezkor sabablar" />

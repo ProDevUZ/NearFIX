@@ -26,7 +26,6 @@ import {
   Image as ImageIcon,
   Info,
   MessageCircle,
-  Mic,
   Plus,
   Send,
   UserRound
@@ -44,6 +43,24 @@ const font = {
 };
 
 const initialMessages = [];
+const MIN_MESSAGE_INPUT_HEIGHT = 24;
+const MAX_MESSAGE_INPUT_HEIGHT = 96;
+const MESSAGE_INPUT_VERTICAL_PADDING = 10;
+const MESSAGE_INPUT_LINE_HEIGHT = 20;
+const APPROX_MESSAGE_CHAR_WIDTH = 7.4;
+
+function estimateInputLines(text, textWidth) {
+  if (!text) return 1;
+
+  const charsPerLine = Math.max(12, Math.floor((textWidth || 220) / APPROX_MESSAGE_CHAR_WIDTH));
+  return String(text)
+    .split("\n")
+    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+}
+
+function inputHeightForLines(lines) {
+  return Math.min(MAX_MESSAGE_INPUT_HEIGHT, Math.max(MIN_MESSAGE_INPUT_HEIGHT, lines * MESSAGE_INPUT_LINE_HEIGHT));
+}
 
 function formatTime(value) {
   return value ? new Date(value).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" }) : "Hozir";
@@ -97,6 +114,8 @@ export function ChatThreadScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [inputHeight, setInputHeight] = useState(MIN_MESSAGE_INPUT_HEIGHT);
+  const [inputTextWidth, setInputTextWidth] = useState(220);
 
   const currentUserId = session?.userId;
 
@@ -160,6 +179,37 @@ export function ChatThreadScreen({ navigation, route }) {
   }, [insets.bottom]);
 
   const canSendText = useMemo(() => Boolean(inputText.trim()) && !uploading, [inputText, uploading]);
+  const inputBoxHeight = inputHeight + MESSAGE_INPUT_VERTICAL_PADDING * 2;
+  const estimatedInputLines = useMemo(() => estimateInputLines(inputText, inputTextWidth), [inputText, inputTextWidth]);
+
+  function updateInputHeight(nextText, measuredHeight) {
+    const estimatedHeight = inputHeightForLines(estimateInputLines(nextText, inputTextWidth));
+    const contentHeight = measuredHeight
+      ? Math.min(MAX_MESSAGE_INPUT_HEIGHT, Math.max(MIN_MESSAGE_INPUT_HEIGHT, measuredHeight))
+      : MIN_MESSAGE_INPUT_HEIGHT;
+    const nextHeight = Math.max(estimatedHeight, contentHeight);
+
+    setInputHeight((current) => (Math.abs(current - nextHeight) < 1 ? current : nextHeight));
+  }
+
+  function handleInputTextChange(nextText) {
+    setInputText(nextText);
+    updateInputHeight(nextText);
+  }
+
+  function handleInputBoxLayout(event) {
+    const nextWidth = Math.max(120, event.nativeEvent.layout.width - 25);
+    setInputTextWidth((current) => (Math.abs(current - nextWidth) < 1 ? current : nextWidth));
+    if (inputText) {
+      const nextHeight = inputHeightForLines(estimateInputLines(inputText, nextWidth));
+      setInputHeight((current) => (Math.abs(current - nextHeight) < 1 ? current : nextHeight));
+    }
+  }
+
+  function handleInputContentSizeChange(event) {
+    const measuredHeight = Math.ceil(event.nativeEvent.contentSize.height);
+    updateInputHeight(inputText, measuredHeight);
+  }
 
   function openAttachmentSheet() {
     Keyboard.dismiss();
@@ -171,6 +221,7 @@ export function ChatThreadScreen({ navigation, route }) {
     if (!body) return;
 
     setInputText("");
+    setInputHeight(MIN_MESSAGE_INPUT_HEIGHT);
 
     if (!isApiRoom) {
       Alert.alert("Chat mavjud emas", "Xabar yuborish uchun haqiqiy chat ochilishi kerak.");
@@ -294,7 +345,7 @@ export function ChatThreadScreen({ navigation, route }) {
             }
       );
 
-      if (!uploadResult.ok) throw new Error(uploadResult.message || "Image upload failed");
+      if (!uploadResult.ok) throw new Error(uploadResult.message || "Rasm yuklanmadi");
 
       const messageResult = await sendChatMessageApi(
         session.token,
@@ -306,7 +357,7 @@ export function ChatThreadScreen({ navigation, route }) {
         currentUserId
       );
 
-      if (!messageResult.ok) throw new Error(messageResult.message || "Image message failed");
+      if (!messageResult.ok) throw new Error(messageResult.message || "Rasmli xabar yuborilmadi");
 
       setMessages((current) =>
         current.map((message) =>
@@ -386,15 +437,25 @@ export function ChatThreadScreen({ navigation, route }) {
           <Pressable style={styles.plusButton} onPress={openAttachmentSheet} disabled={uploading}>
             <Plus size={24} color="#0F80B7" strokeWidth={2.7} />
           </Pressable>
-          <View style={styles.inputBox}>
+          <View style={[styles.inputBox, { height: inputBoxHeight }]} onLayout={handleInputBoxLayout}>
             <TextInput
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputTextChange}
+              onContentSizeChange={handleInputContentSizeChange}
               placeholder="Xabar yozing..."
               placeholderTextColor="#A0A7B3"
-              style={styles.input}
+              multiline
+              blurOnSubmit={false}
+              submitBehavior="newline"
+              returnKeyType="default"
+              keyboardType="default"
+              autoCapitalize="sentences"
+              autoCorrect
+              scrollEnabled={estimatedInputLines > 4}
+              numberOfLines={4}
+              textAlignVertical="top"
+              style={[styles.input, { height: inputHeight }]}
             />
-            <Mic size={19} color="#A0A7B3" strokeWidth={2.7} />
           </View>
           <Pressable style={[styles.sendButton, !canSendText && styles.sendButtonDisabled]} onPress={sendTextMessage} disabled={!canSendText}>
             {uploading ? <ActivityIndicator color="#FFFFFF" /> : <Send size={18} color="#FFFFFF" strokeWidth={2.7} />}
@@ -807,10 +868,11 @@ const styles = StyleSheet.create({
     fontFamily: font.bold
   },
   inputPanel: {
-    height: 68,
+    minHeight: 68,
     paddingHorizontal: 18,
+    paddingVertical: 8,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: 9,
     backgroundColor: "rgba(255,255,255,0.97)",
     borderTopWidth: 1,
@@ -818,24 +880,35 @@ const styles = StyleSheet.create({
   },
   plusButton: {
     width: 34,
-    height: 40,
+    height: 44,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    marginBottom: 2
   },
   inputBox: {
     flex: 1,
-    height: 44,
+    minHeight: 44,
+    maxHeight: 116,
     borderRadius: 18,
     backgroundColor: "#F6F8FB",
-    flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
+    justifyContent: "center",
     paddingLeft: 13,
-    paddingRight: 12
+    paddingRight: 12,
+    paddingVertical: MESSAGE_INPUT_VERTICAL_PADDING
   },
   input: {
-    flex: 1,
+    width: "100%",
+    minWidth: 0,
+    minHeight: 24,
+    maxHeight: MAX_MESSAGE_INPUT_HEIGHT,
     color: "#273248",
     fontSize: 14,
+    lineHeight: 20,
+    paddingVertical: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    includeFontPadding: false,
     fontFamily: font.medium
   },
   sendButton: {

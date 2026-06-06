@@ -8,9 +8,9 @@ import { OrderActions } from "./OrderActions";
 export function ActiveJobCard({ job, onChat, onNavigate, onUpdateStatus, onComplete }) {
   if (!job) return null;
 
-  const category = job.service || "Service";
+  const category = job.service || "Xizmat";
   const jobValue = job.estimatedPayment || job.amount || job.price || "Kelishiladi";
-  const customerName = job.clientName || "Customer";
+  const customerName = job.clientName || "Mijoz";
   const statusKey = job.statusKey || TRACKING_STATUSES.ACCEPTED;
   const statusCopy = trackingStatusCopy[statusKey] || trackingStatusCopy[TRACKING_STATUSES.ACCEPTED];
   const initials = customerName
@@ -32,7 +32,7 @@ export function ActiveJobCard({ job, onChat, onNavigate, onUpdateStatus, onCompl
           {job.rating && job.jobs ? (
             <View style={styles.ratingRow}>
               <Star size={10} color={colors.warning} fill={colors.warning} />
-              <Text style={styles.subtitle}>{job.rating} - {job.jobs} jobs</Text>
+              <Text style={styles.subtitle}>{job.rating} - {job.jobs} ish</Text>
             </View>
           ) : null}
           <View style={styles.statusPill}>
@@ -65,7 +65,7 @@ export function ActiveJobCard({ job, onChat, onNavigate, onUpdateStatus, onCompl
         ) : null}
         <Pressable onPress={onNavigate} style={({ pressed }) => [styles.navigateButton, pressed && styles.pressed]}>
           <Navigation size={13} color={colors.white} strokeWidth={2.5} />
-          <Text style={styles.navigateText}>Navigate</Text>
+          <Text style={styles.navigateText}>Yo'nalish</Text>
         </Pressable>
       </View>
 

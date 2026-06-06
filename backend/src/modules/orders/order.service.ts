@@ -227,9 +227,22 @@ export async function listIncomingOrdersForProvider(user: AuthUser) {
     });
   }
 
+  const now = new Date();
+  await autoCancelExpiredWaitingOrders(now);
+
   return prisma.order.findMany({
     where: {
       status: OrderStatus.WAITING_RESPONSE,
+      OR: [
+        {
+          responseDeadlineAt: null
+        },
+        {
+          responseDeadlineAt: {
+            gt: now
+          }
+        }
+      ],
       worker: {
         userId: user.id
       }

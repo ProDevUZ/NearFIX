@@ -26,6 +26,7 @@ export function WorkerProfileManageScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const isApproved = worker?.status === "approved";
 
   useEffect(() => {
     syncWorkerFromApi();
@@ -42,20 +43,20 @@ export function WorkerProfileManageScreen() {
   }, [worker?.about, worker?.basePriceValue, worker?.cityId, worker?.experienceYears, worker?.name, worker?.profileImageUrl, worker?.professions, worker?.specialty]);
 
   const statusCopy = useMemo(() => {
-    if (worker?.status === "approved") {
+    if (isApproved) {
       return {
         title: "Profil tasdiqlangan",
-        text: "Siz public katalogda ko'rinasiz va buyurtma qabul qilishingiz mumkin.",
+        text: "Siz katalogda ko'rinasiz va buyurtma qabul qilishingiz mumkin.",
         color: colors.success
       };
     }
 
     return {
-      title: "NEW - admin tasdig'i kutilmoqda",
+      title: "Yangi - admin tasdig'i kutilmoqda",
       text: "Ma'lumotlarni to'ldiring. Admin ko'rib chiqqandan keyin siz haqiqiy ustalar ro'yxatiga qo'shilasiz.",
       color: "#F59E0B"
     };
-  }, [worker?.status]);
+  }, [isApproved]);
 
   function toggleService(service) {
     setSelectedServices((current) =>
@@ -109,6 +110,11 @@ export function WorkerProfileManageScreen() {
   }
 
   async function handleSubmit() {
+    if (isApproved) {
+      Alert.alert("Profil tasdiqlangan", "Profilingiz admin tomonidan tasdiqlangan.");
+      return;
+    }
+
     if (!name.trim()) {
       Alert.alert("Ism familiya kerak", "Admin tekshiruvi uchun ismingizni kiriting.");
       return;
@@ -283,13 +289,17 @@ export function WorkerProfileManageScreen() {
 
       <View style={styles.noteCard}>
         <ShieldCheck size={20} color={colors.primary} strokeWidth={2.6} />
-        <Text style={styles.noteText}>Admin tasdiqlamaguncha profilingiz mijozlarga ko'rinmaydi.</Text>
+        <Text style={styles.noteText}>
+          {isApproved ? "Profilingiz tasdiqlangan. Endi mijozlar sizni katalogda ko'radi." : "Admin tasdiqlamaguncha profilingiz mijozlarga ko'rinmaydi."}
+        </Text>
       </View>
 
-      <Pressable onPress={handleSubmit} disabled={saving} style={[styles.submitButton, saving && styles.submitButtonMuted]}>
-        <CheckCircle2 size={21} color={colors.white} strokeWidth={2.6} />
-        <Text style={styles.submitText}>{saving ? "Yuborilmoqda..." : "Admin tekshiruviga yuborish"}</Text>
-      </Pressable>
+      {isApproved ? null : (
+        <Pressable onPress={handleSubmit} disabled={saving} style={[styles.submitButton, saving && styles.submitButtonMuted]}>
+          <CheckCircle2 size={21} color={colors.white} strokeWidth={2.6} />
+          <Text style={styles.submitText}>{saving ? "Yuborilmoqda..." : "Admin tekshiruviga yuborish"}</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }

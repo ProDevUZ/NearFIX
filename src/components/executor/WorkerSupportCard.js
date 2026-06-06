@@ -11,7 +11,7 @@ export function WorkerSupportCard({ onPress }) {
       </View>
       <View style={styles.body}>
         <Text style={styles.title}>Operatsion yordam</Text>
-        <Text style={styles.text}>Mijoz, manzil yoki bekor qilish muammosi bo'lsa supportga xabar bering.</Text>
+        <Text style={styles.text}>Mijoz, manzil yoki bekor qilish muammosi bo'lsa yordam bo'limiga xabar bering.</Text>
       </View>
       <TriangleAlert size={iconSizes.md} color={colors.warning} strokeWidth={2.5} />
     </Pressable>

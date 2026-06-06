@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { ArrowLeft, CalendarDays, MapPin, MessageCircle, Search, WalletCards } from "lucide-react-native";
+import { ArrowLeft, CalendarDays, MapPin, MessageCircle, WalletCards } from "lucide-react-native";
 import { ActiveOrderCard } from "../../components/orders/ActiveOrderCard";
 import { CancelReasonSheet } from "../../components/orders/CancelReasonSheet";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -144,9 +144,6 @@ export function OrdersScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Buyurtmalar</Text>
-          <Pressable style={styles.searchButton}>
-            <Search size={24} color="#0F80B7" strokeWidth={2.8} />
-          </Pressable>
         </View>
 
         <View style={styles.segment}>
@@ -237,14 +234,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F9FB"
   },
   content: {
-    paddingTop: 96,
+    paddingTop: 18,
     paddingHorizontal: 18,
     paddingBottom: 112,
-    gap: 16,
+    gap: 14,
     backgroundColor: "#F0F9FB"
   },
   header: {
-    marginBottom: 6,
+    marginBottom: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between"
@@ -254,19 +251,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 34,
     fontFamily: font.extra
-  },
-  searchButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#0F719D",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
-    elevation: 4
   },
   segment: {
     height: 56,
