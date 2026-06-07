@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { env } from "../../config/env.js";
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
@@ -18,11 +19,7 @@ function base64UrlJson(value: unknown) {
 }
 
 function signToken(data: string) {
-  return crypto.createHmac("sha256", getAccessTokenSecret()).update(data).digest("base64url");
-}
-
-function getAccessTokenSecret() {
-  return process.env.ACCESS_TOKEN_SECRET || process.env.SESSION_SECRET || "nearfix-dev-access-token-secret";
+  return crypto.createHmac("sha256", env.ACCESS_TOKEN_SECRET).update(data).digest("base64url");
 }
 
 export function createRawSessionToken() {

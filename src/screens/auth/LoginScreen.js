@@ -10,13 +10,21 @@ import { colors, iconSizes, radius, shadow } from "../../theme";
 export function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [verifiedName, setVerifiedName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const loginWithPhone = useAuthStore((state) => state.loginWithPhone);
+
+  function normalizePhone(value) {
+    return value.trim().startsWith("+") ? value.trim() : `+998${value.replace(/[^\d]/g, "")}`;
+  }
 
   async function handleContinue() {
     if (submitting) return;
 
-    const cleanPhone = phone.trim().startsWith("+") ? phone.trim() : `+998${phone.replace(/[^\d]/g, "")}`;
+    const cleanPhone = normalizePhone(phone);
     const cleanName = name.trim();
     if (cleanName.length < 2) {
       Alert.alert("Ism familiya kerak", "Tizimga kirish uchun ism familiyangizni kiriting.");
@@ -30,16 +38,30 @@ export function LoginScreen() {
 
     setSubmitting(true);
     try {
+      if (otpRequested && cleanPhone === verifiedPhone && cleanName === verifiedName) {
+        const code = otpCode.trim();
+        if (code.length < 4) {
+          Alert.alert("OTP kod kerak", "SMS orqali kelgan 4 xonali kodni kiriting.");
+          return;
+        }
+
+        const loginResult = await loginWithPhone(cleanPhone, cleanName, code);
+        if (!loginResult.ok) {
+          Alert.alert("Login amalga oshmadi", loginResult.message || "Backend bilan ulanishda xatolik yuz berdi.");
+        }
+        return;
+      }
+
       const smsResult = await requestSmsCode(cleanPhone);
       if (!smsResult.ok) {
         Alert.alert("SMS yuborilmadi", smsResult.message || "Qayta urinib ko'ring.");
         return;
       }
 
-      const loginResult = await loginWithPhone(cleanPhone, cleanName);
-      if (!loginResult.ok) {
-        Alert.alert("Login amalga oshmadi", loginResult.message || "Backend bilan ulanishda xatolik yuz berdi.");
-      }
+      setVerifiedPhone(cleanPhone);
+      setVerifiedName(cleanName);
+      setOtpRequested(true);
+      setOtpCode("");
     } finally {
       setSubmitting(false);
     }
@@ -76,7 +98,11 @@ export function LoginScreen() {
             placeholderTextColor={colors.subtle}
             style={styles.input}
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              setName(value);
+              setOtpRequested(false);
+              setOtpCode("");
+            }}
           />
 
           <Text style={styles.inputLabel}>Telefon raqam</Text>
@@ -90,12 +116,34 @@ export function LoginScreen() {
               placeholderTextColor={colors.subtle}
               style={styles.input}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(value) => {
+                setPhone(value);
+                setOtpRequested(false);
+                setOtpCode("");
+              }}
             />
           </View>
+
+          {otpRequested ? (
+            <>
+              <Text style={styles.inputLabel}>OTP kod</Text>
+              <TextInput
+                keyboardType="number-pad"
+                maxLength={8}
+                placeholder="3243"
+                placeholderTextColor={colors.subtle}
+                style={styles.input}
+                value={otpCode}
+                onChangeText={setOtpCode}
+              />
+            </>
+          ) : null}
         </View>
 
-        <PrimaryButton title={submitting ? "Kirilmoqda..." : "Davom etish"} onPress={handleContinue} />
+        <PrimaryButton
+          title={submitting ? "Kutilmoqda..." : otpRequested ? "Kirish" : "OTP kod olish"}
+          onPress={handleContinue}
+        />
         <Text style={styles.demoHint}>Rol backend/admin tomonidan sessiyaga bog'lanadi.</Text>
         <Text style={styles.terms}>Davom etish orqali foydalanish shartlariga rozilik bildirasiz.</Text>
       </ScrollView>

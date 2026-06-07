@@ -186,11 +186,12 @@ export async function updateOrderStatusApi(token, orderId, statusKey) {
   });
 }
 
-export async function rejectOrderApi(token, orderId) {
+export async function rejectOrderApi(token, orderId, reason) {
   return apiRequest(async () => {
     const payload = await httpAuthRequest(`/orders/${orderId}/reject`, {
       method: "POST",
-      token
+      token,
+      body: { reason }
     });
 
     return {

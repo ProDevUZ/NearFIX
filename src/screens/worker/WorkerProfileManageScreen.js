@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, CheckCircle2, Clock3, LogOut, ShieldCheck, UserRound } from "lucide-react-native";
+import { Bell, Camera, CheckCircle2, Clock3, LogOut, ShieldCheck, UserRound } from "lucide-react-native";
 import { CITIES } from "../../constants/catalog";
+import { ROUTES } from "../../constants/routes";
 import { uploadMediaApi } from "../../services/media/mediaService";
+import { fetchUnreadNotificationCountApi } from "../../services/notifications/notificationService";
 import { useAuthStore } from "../../store/authStore";
 import { useWorkerStore } from "../../store/workerStore";
 import { colors, radius, shadow } from "../../theme";
 
 const serviceOptions = ["Santexnik", "Elektrik", "Payvandchi", "Usta", "Konditsioner", "Ta'mirlash", "Tozalash"];
 
-export function WorkerProfileManageScreen() {
+export function WorkerProfileManageScreen({ navigation }) {
   const token = useAuthStore((state) => state.session?.token);
   const logout = useAuthStore((state) => state.logout);
   const worker = useWorkerStore((state) => state.workerProfile);
@@ -26,11 +29,28 @@ export function WorkerProfileManageScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const isApproved = worker?.status === "approved";
 
   useEffect(() => {
     syncWorkerFromApi();
   }, [syncWorkerFromApi]);
+
+  const loadUnreadNotifications = useCallback(async () => {
+    if (!token) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    const result = await fetchUnreadNotificationCountApi(token);
+    if (result.ok) setUnreadNotifications(result.count);
+  }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadNotifications();
+    }, [loadUnreadNotifications])
+  );
 
   useEffect(() => {
     setName(worker?.name || "");
@@ -198,9 +218,19 @@ export function WorkerProfileManageScreen() {
             <Text style={styles.eyebrow}>Profil sozlamalari</Text>
             <Text style={styles.title}>Usta profili</Text>
           </View>
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <LogOut size={22} color={colors.danger} strokeWidth={2.7} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconButton} onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}>
+              <Bell size={21} color={colors.text} strokeWidth={2.7} />
+              {unreadNotifications > 0 ? (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable style={styles.logoutButton} onPress={handleLogout}>
+              <LogOut size={22} color={colors.danger} strokeWidth={2.7} />
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.subtitle}>Tasdiqdan oldin kerakli ma'lumotlarni to'ldiring</Text>
       </View>
@@ -347,6 +377,38 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 34,
     fontFamily: "Inter_800ExtraBold"
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -5,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5
+  },
+  notificationBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900"
   },
   logoutButton: {
     width: 42,

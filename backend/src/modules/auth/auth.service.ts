@@ -20,9 +20,20 @@ type LoginInput = {
 
 const defaultAuthProvider = new FakeAuthProvider();
 
+function isTestOtpAllowed() {
+  return env.NODE_ENV !== "production";
+}
+
 export async function loginOrRegisterWithPhone(input: LoginInput, authProvider: AuthProvider = defaultAuthProvider) {
   const phone = normalizePhone(input.phone);
-  const otpCode = input.code || "1111";
+  const otpCode = input.code || "";
+
+  if (authProvider === defaultAuthProvider && !isTestOtpAllowed()) {
+    throw Object.assign(new Error("Invalid OTP code"), {
+      status: 401,
+      code: "INVALID_OTP"
+    });
+  }
 
   await authProvider.sendOtp(phone);
 

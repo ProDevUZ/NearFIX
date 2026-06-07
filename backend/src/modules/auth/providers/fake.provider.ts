@@ -1,6 +1,6 @@
 import type { AuthProvider } from "./auth-provider.interface.js";
 
-const FAKE_OTP_CODE = "1111";
+const FAKE_OTP_CODE = "3243";
 
 export class FakeAuthProvider implements AuthProvider {
   async sendOtp(phone: string) {

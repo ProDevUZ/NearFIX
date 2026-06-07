@@ -23,3 +23,5 @@ export const transitionOrderSchema = z.object({
 export const cancelOrderSchema = z.object({
   reason: z.string().min(3).max(240)
 });
+
+export const rejectOrderSchema = cancelOrderSchema;

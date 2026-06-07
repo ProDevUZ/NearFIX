@@ -1,7 +1,9 @@
 import { Router, type Request } from "express";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requireRole } from "../auth/middleware/role.guard.js";
-import { cancelOrderSchema, createOrderSchema, transitionOrderSchema } from "./order.contracts.js";
+import { cancelOrderSchema, createOrderSchema, rejectOrderSchema, transitionOrderSchema } from "./order.contracts.js";
+import { createReviewSchema } from "../reviews/review.contracts.js";
+import { createOrderReview } from "../reviews/review.service.js";
 import {
   acceptOrder,
   autoCancelExpiredWaitingOrders,
@@ -101,7 +103,8 @@ orderRouter.post("/:orderId/accept", authenticate, async (request, response, nex
 
 orderRouter.post("/:orderId/reject", authenticate, requireRole("PROVIDER"), async (request, response, next) => {
   try {
-    const order = await rejectOrder(request.user!, getOrderId(request));
+    const input = rejectOrderSchema.parse(request.body);
+    const order = await rejectOrder(request.user!, getOrderId(request), input.reason);
 
     response.json({
       ok: true,
@@ -120,6 +123,21 @@ orderRouter.post("/:orderId/status", authenticate, async (request, response, nex
     response.json({
       ok: true,
       order
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+orderRouter.post("/:orderId/review", authenticate, async (request, response, next) => {
+  try {
+    const input = createReviewSchema.parse(request.body);
+    const result = await createOrderReview(request.user!, getOrderId(request), input);
+
+    response.status(201).json({
+      ok: true,
+      review: result.review,
+      rating: result.rating
     });
   } catch (error) {
     next(error);

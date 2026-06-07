@@ -4,6 +4,7 @@ import {
   OrderStatus,
   ChatParticipantRole,
   ChatRoomType,
+  type Prisma,
   UserRole,
   WorkerAvailabilityStatus,
   WorkerProfileStatus
@@ -63,6 +64,80 @@ function assertOrderAssignedToProvider(order: { worker: { userId: string } }, us
   }
 }
 
+async function releaseWorkerAvailability(tx: Prisma.TransactionClient, workerId: string, orderId: string) {
+  const released = await tx.workerAvailability.updateMany({
+    where: {
+      workerId,
+      activeOrderId: orderId
+    },
+    data: {
+      status: WorkerAvailabilityStatus.AVAILABLE,
+      activeOrderId: null,
+      lockedUntil: null
+    }
+  });
+
+  if (released.count !== 1) {
+    throw Object.assign(new Error("Worker availability release failed"), {
+      status: 409,
+      code: "WORKER_RELEASE_FAILED"
+    });
+  }
+}
+
+async function notifyOrderCancelled(input: {
+  orderId: string;
+  publicCode: string;
+  serviceType: string;
+  clientId: string;
+  workerUserId: string;
+  actor: OrderEventActorType;
+  reason?: string;
+}) {
+  const recipients =
+    input.actor === OrderEventActorType.CLIENT
+      ? [input.workerUserId]
+      : input.actor === OrderEventActorType.WORKER
+        ? [input.clientId]
+        : [input.clientId, input.workerUserId];
+
+  const uniqueRecipients = Array.from(new Set(recipients));
+
+  for (const userId of uniqueRecipients) {
+    await createNotification({
+      userId,
+      orderId: input.orderId,
+      type: "ORDER_CANCELLED",
+      title: "Buyurtma bekor qilindi",
+      body: `${input.serviceType} buyurtmasi bekor qilindi.`,
+      payload: {
+        orderId: input.orderId,
+        publicCode: input.publicCode,
+        actor: input.actor,
+        reason: input.reason
+      }
+    });
+  }
+}
+
+const lifecycleNotificationCopy: Partial<Record<OrderStatus, { type: string; title: string; body: string }>> = {
+  [OrderStatus.ON_THE_WAY]: {
+    type: "ORDER_ON_THE_WAY",
+    title: "Usta yo'lga chiqdi",
+    body: "Usta sizning buyurtmangiz tomon yo'lga chiqdi."
+  },
+  [OrderStatus.IN_PROGRESS]: {
+    type: "ORDER_IN_PROGRESS",
+    title: "Ish boshlandi",
+    body: "Usta buyurtma ustida ish boshladi."
+  },
+  [OrderStatus.COMPLETED]: {
+    type: "ORDER_COMPLETED",
+    title: "Buyurtma yakunlandi",
+    body: "Buyurtma muvaffaqiyatli yakunlandi."
+  }
+};
+
 export async function createOrder(user: AuthUser, input: CreateOrderInput) {
   if (user.role !== UserRole.CLIENT.toLowerCase()) {
     throw Object.assign(new Error("Only clients can create orders"), {
@@ -85,6 +160,27 @@ export async function createOrder(user: AuthUser, input: CreateOrderInput) {
         status: 404,
         code: "WORKER_NOT_BOOKABLE"
       });
+    }
+
+    if (input.addressId) {
+      const address = await tx.address.findUnique({
+        where: { id: input.addressId },
+        select: { userId: true }
+      });
+
+      if (!address) {
+        throw Object.assign(new Error("Address not found"), {
+          status: 404,
+          code: "ADDRESS_NOT_FOUND"
+        });
+      }
+
+      if (address.userId !== user.id) {
+        throw Object.assign(new Error("Address access denied"), {
+          status: 403,
+          code: "ADDRESS_ACCESS_DENIED"
+        });
+      }
     }
 
     const order = await tx.order.create({
@@ -345,7 +441,7 @@ export async function acceptOrder(user: AuthUser, orderId: string) {
   return acceptedOrder;
 }
 
-export async function rejectOrder(user: AuthUser, orderId: string) {
+export async function rejectOrder(user: AuthUser, orderId: string, reason: string) {
   if (user.role !== UserRole.PROVIDER.toLowerCase()) {
     throw Object.assign(new Error("Only provider can reject order"), {
       status: 403,
@@ -353,7 +449,56 @@ export async function rejectOrder(user: AuthUser, orderId: string) {
     });
   }
 
-  const rejectedOrder = await cancelOrder(user, orderId, "Worker rejected request", OrderEventType.WORKER_REJECTED);
+  const rejectedOrder = await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { worker: true }
+    });
+
+    if (!order) {
+      throw Object.assign(new Error("Order not found"), {
+        status: 404,
+        code: "ORDER_NOT_FOUND"
+      });
+    }
+
+    assertOrderAssignedToProvider(order, user);
+
+    if (order.status !== OrderStatus.WAITING_RESPONSE) {
+      throw Object.assign(new Error("Worker reject is only allowed while waiting for response"), {
+        status: 409,
+        code: "WORKER_REJECT_NOT_ALLOWED"
+      });
+    }
+
+    await transitionOrderStatus(tx, {
+      orderId: order.id,
+      fromStatus: OrderStatus.WAITING_RESPONSE,
+      toStatus: OrderStatus.CANCELLED,
+      data: {
+        cancelReason: reason
+      },
+      conflictCode: "WORKER_REJECT_NOT_ALLOWED"
+    });
+
+    await releaseWorkerAvailability(tx, order.workerId, order.id);
+
+    await tx.orderEvent.create({
+      data: {
+        orderId: order.id,
+        actorType: OrderEventActorType.WORKER,
+        actorId: user.id,
+        eventType: OrderEventType.WORKER_REJECTED,
+        fromStatus: OrderStatus.WAITING_RESPONSE,
+        toStatus: OrderStatus.CANCELLED,
+        message: reason
+      }
+    });
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: order.id }
+    });
+  });
 
   await createNotification({
     userId: rejectedOrder.clientId,
@@ -379,7 +524,7 @@ export async function transitionOrder(user: AuthUser, orderId: string, toStatus:
     });
   }
 
-  return prisma.$transaction(async (tx) => {
+  const transitionedOrder = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { worker: true }
@@ -442,6 +587,25 @@ export async function transitionOrder(user: AuthUser, orderId: string, toStatus:
       include: orderInclude
     });
   });
+
+  const notificationCopy = lifecycleNotificationCopy[toStatus];
+  if (notificationCopy) {
+    await createNotification({
+      userId: transitionedOrder.clientId,
+      orderId: transitionedOrder.id,
+      type: notificationCopy.type,
+      title: notificationCopy.title,
+      body: notificationCopy.body,
+      payload: {
+        orderId: transitionedOrder.id,
+        notificationType: notificationCopy.type,
+        publicCode: transitionedOrder.publicCode,
+        status: transitionedOrder.status
+      }
+    });
+  }
+
+  return transitionedOrder;
 }
 
 export async function cancelOrder(
@@ -450,7 +614,7 @@ export async function cancelOrder(
   reason: string,
   eventType: OrderEventType = OrderEventType.ORDER_CANCELLED
 ) {
-  return prisma.$transaction(async (tx) => {
+  const cancelledOrder = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { worker: true }
@@ -481,17 +645,7 @@ export async function cancelOrder(
       }
     });
 
-    await tx.workerAvailability.updateMany({
-      where: {
-        workerId: order.workerId,
-        activeOrderId: order.id
-      },
-      data: {
-        status: WorkerAvailabilityStatus.AVAILABLE,
-        activeOrderId: null,
-        lockedUntil: null
-      }
-    });
+    await releaseWorkerAvailability(tx, order.workerId, order.id);
 
     await tx.orderEvent.create({
       data: {
@@ -506,9 +660,24 @@ export async function cancelOrder(
     });
 
     return tx.order.findUniqueOrThrow({
-      where: { id: order.id }
+      where: { id: order.id },
+      include: {
+        worker: true
+      }
     });
   });
+
+  await notifyOrderCancelled({
+    orderId: cancelledOrder.id,
+    publicCode: cancelledOrder.publicCode,
+    serviceType: cancelledOrder.serviceType,
+    clientId: cancelledOrder.clientId,
+    workerUserId: cancelledOrder.worker.userId,
+    actor: actorTypeForUser(user),
+    reason
+  });
+
+  return cancelledOrder;
 }
 
 export async function autoCancelExpiredWaitingOrders(now = new Date()) {
@@ -522,7 +691,7 @@ export async function autoCancelExpiredWaitingOrders(now = new Date()) {
   });
 
   for (const order of expiredOrders) {
-    await prisma.$transaction(async (tx) => {
+    const cancelledOrder = await prisma.$transaction(async (tx) => {
       await transitionOrderStatus(tx, {
         orderId: order.id,
         fromStatus: OrderStatus.WAITING_RESPONSE,
@@ -533,17 +702,7 @@ export async function autoCancelExpiredWaitingOrders(now = new Date()) {
         conflictCode: "ORDER_STATUS_CONFLICT"
       });
 
-      await tx.workerAvailability.updateMany({
-        where: {
-          workerId: order.workerId,
-          activeOrderId: order.id
-        },
-        data: {
-          status: WorkerAvailabilityStatus.AVAILABLE,
-          activeOrderId: null,
-          lockedUntil: null
-        }
-      });
+      await releaseWorkerAvailability(tx, order.workerId, order.id);
 
       await tx.orderEvent.create({
         data: {
@@ -555,6 +714,23 @@ export async function autoCancelExpiredWaitingOrders(now = new Date()) {
           message: "Auto-cancelled after 1 hour without worker response"
         }
       });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: {
+          worker: true
+        }
+      });
+    });
+
+    await notifyOrderCancelled({
+      orderId: cancelledOrder.id,
+      publicCode: cancelledOrder.publicCode,
+      serviceType: cancelledOrder.serviceType,
+      clientId: cancelledOrder.clientId,
+      workerUserId: cancelledOrder.worker.userId,
+      actor: OrderEventActorType.SYSTEM,
+      reason: "Worker did not respond within 1 hour"
     });
   }
 

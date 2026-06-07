@@ -185,7 +185,7 @@ export function WorkerProfileScreen({ navigation }) {
           <MessageCircle size={24} color="#0F80B7" strokeWidth={2.7} />
         </Pressable>
         <Pressable onPress={handleBook} style={[styles.bookButton, !isBookable && styles.bookButtonDisabled]}>
-          <Text style={styles.bookButtonText}>Bron qilish</Text>
+          <Text style={styles.bookButtonText}>Buyurtma berish</Text>
         </Pressable>
       </View>
       <ScreenBottomNav navigation={navigation} />

@@ -2,7 +2,7 @@ import { env } from "../../constants/env";
 import { useAuthStore } from "../../store/authStore";
 import { ApiError, httpRequest, isApiEnabled } from "./client";
 
-const refreshableCodes = new Set(["ACCESS_TOKEN_EXPIRED"]);
+const refreshableCodes = new Set(["ACCESS_TOKEN_EXPIRED", "ACCESS_TOKEN_INVALID"]);
 
 async function getFreshAccessToken(error) {
   if (error?.status !== 401 || !refreshableCodes.has(error?.code)) return null;

@@ -204,16 +204,31 @@ export const useWorkerStore = create((set, get) => ({
       message: workerOrderErrorMessage(result, "Buyurtmani qabul qilib bo'lmadi. Qayta urinib ko'ring.")
     };
   },
-  rejectIncomingRequest: async (requestId) => {
+  rejectIncomingRequest: async (requestId, reason) => {
     const token = useAuthStore.getState().session?.token;
 
-    if (token) {
-      await rejectOrderApi(token, requestId);
+    if (!token) {
+      return { ok: false, message: "Buyurtmani bekor qilish uchun tizimga kiring." };
     }
 
-    set((state) => ({
-      incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId)
-    }));
+    const result = await rejectOrderApi(token, requestId, reason);
+    if (result.ok) {
+      set((state) => ({
+        incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId)
+      }));
+      return result;
+    }
+
+    if (shouldRemoveIncomingRequest(result)) {
+      set((state) => ({
+        incomingRequests: state.incomingRequests.filter((item) => item.id !== requestId)
+      }));
+    }
+
+    return {
+      ...result,
+      message: workerOrderErrorMessage(result, "Buyurtmani bekor qilib bo'lmadi. Qayta urinib ko'ring.")
+    };
   },
   updateActiveJobStatus: async (statusKey) => {
     const token = useAuthStore.getState().session?.token;

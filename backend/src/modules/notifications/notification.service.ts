@@ -80,6 +80,15 @@ export async function listNotifications(userId: string) {
   });
 }
 
+export async function countUnreadNotifications(userId: string) {
+  return prisma.notification.count({
+    where: {
+      userId,
+      readAt: null
+    }
+  });
+}
+
 export async function markNotificationRead(userId: string, notificationId: string) {
   return prisma.notification.update({
     where: { id: notificationId, userId },
@@ -98,6 +107,15 @@ export async function savePushToken(userId: string, token: string, platform?: st
       userId,
       token,
       platform
+    }
+  });
+}
+
+export async function deletePushToken(userId: string, token: string) {
+  return prisma.pushToken.deleteMany({
+    where: {
+      userId,
+      token
     }
   });
 }

@@ -6,6 +6,7 @@ import { ROUTES } from "../constants/routes";
 import { ChatScreen } from "../screens/chats/ChatScreen";
 import { ChatThreadScreen } from "../screens/chats/ChatThreadScreen";
 import { MapPickerScreen } from "../screens/maps/MapPickerScreen";
+import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { WorkerDashboardScreen } from "../screens/worker/WorkerDashboardScreen";
 import { WorkerEarningsScreen } from "../screens/worker/WorkerEarningsScreen";
 import { WorkerJobsScreen } from "../screens/worker/WorkerJobsScreen";
@@ -35,6 +36,7 @@ export function WorkerNavigator() {
       <Stack.Screen name={ROUTES.CHATS_TAB} component={ChatScreen} />
       <Stack.Screen name={ROUTES.MAP_PICKER} component={MapPickerScreen} />
       <Stack.Screen name={ROUTES.CHAT_THREAD} component={ChatThreadScreen} />
+      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

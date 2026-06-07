@@ -9,13 +9,14 @@ export async function requestSmsCode(phone, role) {
   }));
 }
 
-export async function loginWithPhoneApi(phone, name) {
+export async function loginWithPhoneApi(phone, name, code) {
   return apiRequest(async () => {
     const payload = await httpRequest("/auth/phone", {
       method: "POST",
       body: {
         phone,
-        ...(name ? { name } : {})
+        ...(name ? { name } : {}),
+        ...(code ? { code } : {})
       }
     });
 
@@ -86,8 +87,16 @@ export async function refreshAccessTokenApi(refreshToken) {
   });
 }
 
-export async function logoutApi(token) {
+export async function logoutApi(token, pushToken) {
   return apiRequest(async () => {
+    if (pushToken) {
+      await httpRequest("/notifications/push-token", {
+        method: "DELETE",
+        token,
+        body: { token: pushToken }
+      }).catch(() => null);
+    }
+
     await httpRequest("/auth/logout", {
       method: "POST",
       token

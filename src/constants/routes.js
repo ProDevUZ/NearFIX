@@ -19,7 +19,8 @@ export const ROUTES = {
   WORKER_PROFILE: "WorkerProfile",
   BOOKING: "Booking",
   MAP_PICKER: "MapPicker",
-  CHAT_THREAD: "ChatThread"
+  CHAT_THREAD: "ChatThread",
+  NOTIFICATIONS: "Notifications"
 };
 
 export const USER_ROLES = {

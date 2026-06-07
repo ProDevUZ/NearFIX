@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requireRole } from "../auth/middleware/role.guard.js";
+import { getWorkerRating, listWorkerReviews } from "../reviews/review.service.js";
 import { updateAvailabilitySchema, updateWorkerProfileSchema } from "./worker.contracts.js";
 import {
   getCatalogWorkers,
@@ -66,6 +67,32 @@ workerRouter.get("/me/transactions", authenticate, requireRole("PROVIDER"), asyn
     response.json({
       ok: true,
       transactions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workerRouter.get("/:workerId/reviews", async (request, response, next) => {
+  try {
+    const reviews = await listWorkerReviews(String(request.params.workerId));
+
+    response.json({
+      ok: true,
+      reviews
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workerRouter.get("/:workerId/rating", async (request, response, next) => {
+  try {
+    const rating = await getWorkerRating(String(request.params.workerId));
+
+    response.json({
+      ok: true,
+      rating
     });
   } catch (error) {
     next(error);

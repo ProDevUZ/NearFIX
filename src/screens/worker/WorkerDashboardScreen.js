@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ArrowUpRight, CheckCircle2, Clock3 } from "lucide-react-native";
 import { ActiveJobCard } from "../../components/executor/ActiveJobCard";
 import { EarningsSummary } from "../../components/executor/EarningsSummary";
@@ -11,11 +11,19 @@ import { SectionHeader } from "../../components/ui/SectionHeader";
 import { trackingStatusCopy } from "../../constants/orderTracking";
 import { ROUTES } from "../../constants/routes";
 import { ensureOrderChatRoomApi } from "../../services/chats/chatService";
-import { registerPushTokenApi } from "../../services/notifications/notificationService";
 import { useAuthStore } from "../../store/authStore";
 import { WORKER_STATUS } from "../../constants/workerStatus";
 import { useWorkerStore } from "../../store/workerStore";
 import { colors, iconSizes, radius, shadow } from "../../theme";
+
+const REJECTION_REASONS = [
+  "Hozir bandman",
+  "Manzil uzoq",
+  "Kerakli asbob yo'q",
+  "Bu xizmatni bajarmayman",
+  "Vaqt to'g'ri kelmaydi",
+  "Boshqa sabab"
+];
 
 export function WorkerDashboardScreen({ navigation }) {
   const session = useAuthStore((state) => state.session);
@@ -33,16 +41,12 @@ export function WorkerDashboardScreen({ navigation }) {
   const syncWorkerFromApi = useWorkerStore((state) => state.syncWorkerFromApi);
   const canAccept = status === WORKER_STATUS.AVAILABLE && !activeJob;
   const [refreshing, setRefreshing] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
     syncWorkerFromApi();
   }, [syncWorkerFromApi]);
-
-  useEffect(() => {
-    if (session?.token) {
-      registerPushTokenApi(session.token);
-    }
-  }, [session?.token]);
 
   async function handleAccept(requestId) {
     const result = await acceptIncomingRequest(requestId);
@@ -52,6 +56,22 @@ export function WorkerDashboardScreen({ navigation }) {
     }
 
     Alert.alert("Buyurtma qabul qilinmadi", result?.message || "Qayta urinib ko'ring.");
+  }
+
+  async function handleReject(reason) {
+    if (!rejectTarget?.id || rejecting) return;
+
+    setRejecting(true);
+    const result = await rejectIncomingRequest(rejectTarget.id, reason);
+    setRejecting(false);
+
+    if (result?.ok) {
+      setRejectTarget(null);
+      Alert.alert("Buyurtma bekor qilindi", "Sabab mijozga yuborildi.");
+      return;
+    }
+
+    Alert.alert("Buyurtma bekor qilinmadi", result?.message || "Qayta urinib ko'ring.");
   }
 
   async function handleComplete() {
@@ -97,60 +117,72 @@ export function WorkerDashboardScreen({ navigation }) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#0F80B7" colors={["#0F80B7"]} />}
-    >
-      <View style={styles.headerBlock}>
-        <WorkerDashboardHeader workerName={worker?.name || "Usta"} />
-      </View>
-
-      <WorkerStatusCard status={status} activeJob={activeJob} onChangeStatus={setOperationalStatus} />
-      <EarningsSummary earnings={earnings} worker={worker} />
-
-      <View style={styles.sectionBlock}>
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Faol ish</Text>
-          {activeJob ? <StatusPill label={trackingStatusCopy[activeJob.statusKey]?.title || "Faol"} /> : null}
+    <>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#0F80B7" colors={["#0F80B7"]} />}
+      >
+        <View style={styles.headerBlock}>
+          <WorkerDashboardHeader workerName={worker?.name || "Usta"} />
         </View>
-        {activeJob ? (
-          <ActiveJobCard
-            job={activeJob}
-            onChat={handleOpenJobChat}
-            onNavigate={handleNavigateToJob}
-            onUpdateStatus={handleUpdateStatus}
-            onComplete={handleComplete}
-          />
-        ) : (
-          <EmptyState
-            title="Faol ish yo'q"
-            text="Keyingi buyurtmaga tayyorsiz. Yangi buyurtma kelganda shu yerda qabul qiling."
-          />
-        )}
-      </View>
 
-      <View style={styles.sectionBlock}>
-        <SectionHeader title="Kelgan buyurtmalar" action="Barchasi" />
-        <View style={styles.stack}>
-          {incomingRequests.length ? (
-            incomingRequests.slice(0, 2).map((request, index) => (
-              <IncomingOrderCard
-                key={request.id}
-                request={request}
-                disabled={!canAccept}
-                index={index}
-                onAccept={() => handleAccept(request.id)}
-                onReject={() => rejectIncomingRequest(request.id)}
-              />
-            ))
+        <WorkerStatusCard status={status} activeJob={activeJob} onChangeStatus={setOperationalStatus} />
+        <EarningsSummary earnings={earnings} worker={worker} />
+
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionTitle}>Faol ish</Text>
+            {activeJob ? <StatusPill label={trackingStatusCopy[activeJob.statusKey]?.title || "Faol"} /> : null}
+          </View>
+          {activeJob ? (
+            <ActiveJobCard
+              job={activeJob}
+              onChat={handleOpenJobChat}
+              onNavigate={handleNavigateToJob}
+              onUpdateStatus={handleUpdateStatus}
+              onComplete={handleComplete}
+            />
           ) : (
-            <EmptyState title="Kelgan buyurtmalar yo'q" text="Onlayn bo'ling. Mijozlar yuborgan yaqin buyurtmalar shu yerda ko'rinadi." />
+            <EmptyState
+              title="Faol ish yo'q"
+              text="Keyingi buyurtmaga tayyorsiz. Yangi buyurtma kelganda shu yerda qabul qiling."
+            />
           )}
         </View>
-      </View>
 
-      <WeeklyPerformanceSummary earnings={earnings} worker={worker} completedOrders={completedOrders} />
-    </ScrollView>
+        <View style={styles.sectionBlock}>
+          <SectionHeader title="Kelgan buyurtmalar" action="Barchasi" />
+          <View style={styles.stack}>
+            {incomingRequests.length ? (
+              incomingRequests.slice(0, 2).map((request, index) => (
+                <IncomingOrderCard
+                  key={request.id}
+                  request={request}
+                  disabled={!canAccept}
+                  index={index}
+                  onAccept={() => handleAccept(request.id)}
+                  onReject={() => setRejectTarget(request)}
+                />
+              ))
+            ) : (
+              <EmptyState title="Kelgan buyurtmalar yo'q" text="Onlayn bo'ling. Mijozlar yuborgan yaqin buyurtmalar shu yerda ko'rinadi." />
+            )}
+          </View>
+        </View>
+
+        <WeeklyPerformanceSummary earnings={earnings} worker={worker} completedOrders={completedOrders} />
+      </ScrollView>
+
+      <RejectReasonModal
+        visible={Boolean(rejectTarget)}
+        request={rejectTarget}
+        loading={rejecting}
+        onClose={() => {
+          if (!rejecting) setRejectTarget(null);
+        }}
+        onSelectReason={handleReject}
+      />
+    </>
   );
 }
 
@@ -197,6 +229,37 @@ function WeeklyMetric({ icon, label, value }) {
       </Text>
       <Text style={styles.weeklyLabel}>{label}</Text>
     </View>
+  );
+}
+
+function RejectReasonModal({ visible, request, loading, onClose, onSelectReason }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <Pressable style={styles.backdropPressable} onPress={onClose} />
+        <View style={styles.reasonSheet}>
+          <Text style={styles.reasonTitle}>Bekor qilish sababi</Text>
+          <Text style={styles.reasonSubtitle} numberOfLines={2}>
+            {request?.clientName || "Mijoz"} buyurtmasini bekor qilish uchun sabab tanlang.
+          </Text>
+          <View style={styles.reasonList}>
+            {REJECTION_REASONS.map((reason) => (
+              <Pressable
+                key={reason}
+                disabled={loading}
+                onPress={() => onSelectReason(reason)}
+                style={({ pressed }) => [styles.reasonButton, pressed && styles.pressed, loading && styles.reasonDisabled]}
+              >
+                <Text style={styles.reasonButtonText}>{reason}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable disabled={loading} onPress={onClose} style={({ pressed }) => [styles.closeReasonButton, pressed && styles.pressed]}>
+            <Text style={styles.closeReasonText}>Ortga</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -289,5 +352,71 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     fontWeight: "600"
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.38)",
+    justifyContent: "flex-end"
+  },
+  backdropPressable: {
+    ...StyleSheet.absoluteFillObject
+  },
+  reasonSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.white,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+    gap: 12
+  },
+  reasonTitle: {
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "900"
+  },
+  reasonSubtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600"
+  },
+  reasonList: {
+    gap: 9
+  },
+  reasonButton: {
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: "#FFF5F5",
+    borderWidth: 1,
+    borderColor: "#F3B4AF",
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  reasonDisabled: {
+    opacity: 0.55
+  },
+  reasonButtonText: {
+    color: "#B42318",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  closeReasonButton: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.subtle,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  closeReasonText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  pressed: {
+    opacity: 0.78
   }
 });

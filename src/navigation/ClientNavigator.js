@@ -10,6 +10,7 @@ import { WorkerProfileScreen } from "../screens/marketplace/WorkerProfileScreen"
 import { ChatScreen } from "../screens/chats/ChatScreen";
 import { ChatThreadScreen } from "../screens/chats/ChatThreadScreen";
 import { MapPickerScreen } from "../screens/maps/MapPickerScreen";
+import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { OrdersScreen } from "../screens/orders/OrdersScreen";
 import { ClientProfileScreen } from "../screens/profile/ClientProfileScreen";
 
@@ -36,6 +37,7 @@ export function ClientNavigator() {
       <Stack.Screen name={ROUTES.BOOKING} component={BookingScreen} />
       <Stack.Screen name={ROUTES.MAP_PICKER} component={MapPickerScreen} />
       <Stack.Screen name={ROUTES.CHAT_THREAD} component={ChatThreadScreen} />
+      <Stack.Screen name={ROUTES.NOTIFICATIONS} component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

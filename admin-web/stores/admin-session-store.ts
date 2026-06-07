@@ -55,23 +55,28 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
     }
   },
   loginWithPhone: async (phone) => {
-    const result = await loginAdmin(phone);
-    if (result.user.role !== "admin") {
-      return { ok: false, message: "Admin role required" };
-    }
+    try {
+      const result = await loginAdmin(phone);
+      if (result.user.role !== "admin") {
+        return { ok: false, message: "Admin role required" };
+      }
 
-    window.localStorage.setItem("nearfix-admin-token", result.token);
-    set({
-      session: {
-        id: result.user.id,
-        phone: result.user.phone,
-        name: result.user.name,
-        role: result.user.role,
-        token: result.token
-      },
-      isSessionReady: true
-    });
-    return { ok: true };
+      window.localStorage.setItem("nearfix-admin-token", result.token);
+      set({
+        session: {
+          id: result.user.id,
+          phone: result.user.phone,
+          name: result.user.name,
+          role: result.user.role,
+          token: result.token
+        },
+        isSessionReady: true
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Login failed";
+      return { ok: false, message };
+    }
   },
   logout: () => {
     window.localStorage.removeItem("nearfix-admin-token");

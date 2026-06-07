@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   Bell,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react-native";
 import { ROUTES } from "../../constants/routes";
 import { LANGUAGES, translate } from "../../i18n/translations";
+import { fetchUnreadNotificationCountApi } from "../../services/notifications/notificationService";
 import { useAuthStore } from "../../store/authStore";
 import { useClientStore } from "../../store/clientStore";
 import { useUiStore } from "../../store/uiStore";
@@ -51,6 +53,7 @@ export function ClientProfileScreen({ navigation, route }) {
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [addressFormMode, setAddressFormMode] = useState("create");
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [addressDraft, setAddressDraft] = useState({
@@ -76,6 +79,22 @@ export function ClientProfileScreen({ navigation, route }) {
   useEffect(() => {
     syncClientProfileFromApi();
   }, [syncClientProfileFromApi]);
+
+  const loadUnreadNotifications = useCallback(async () => {
+    if (!session?.token) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    const result = await fetchUnreadNotificationCountApi(session.token);
+    if (result.ok) setUnreadNotifications(result.count);
+  }, [session?.token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadNotifications();
+    }, [loadUnreadNotifications])
+  );
 
   useEffect(() => {
     const selectedLocation = route?.params?.selectedLocation;
@@ -253,8 +272,13 @@ export function ClientProfileScreen({ navigation, route }) {
             </View>
             <Text style={styles.logoText}>Near<Text style={styles.logoAccent}>FIX</Text></Text>
           </View>
-          <Pressable style={styles.notificationButton}>
+          <Pressable style={styles.notificationButton} onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}>
             <Bell size={23} color="#273248" strokeWidth={2.6} />
+            {unreadNotifications > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
 
@@ -624,6 +648,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 18,
     elevation: 5
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -5,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#2CD8A5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5
+  },
+  notificationBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontFamily: font.extra
   },
   divider: {
     height: 1,

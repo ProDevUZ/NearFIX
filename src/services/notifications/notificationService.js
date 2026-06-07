@@ -1,7 +1,10 @@
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { apiRequest } from "../api/client";
 import { httpAuthRequest } from "../api/authenticatedClient";
+
+export const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
 
 export async function fetchNotificationsApi(token) {
   return apiRequest(async () => {
@@ -54,7 +57,10 @@ export async function registerPushTokenApi(token) {
 
     const result = await Notifications.getExpoPushTokenAsync();
     const pushToken = result.data;
-    await savePushTokenApi(token, pushToken);
+    const saveResult = await savePushTokenApi(token, pushToken);
+    if (!saveResult.ok) return saveResult;
+
+    await AsyncStorage.setItem(PUSH_TOKEN_STORAGE_KEY, pushToken);
 
     return {
       ok: true,
@@ -64,11 +70,12 @@ export async function registerPushTokenApi(token) {
 }
 
 export async function fetchUnreadNotificationCountApi(token) {
-  const result = await fetchNotificationsApi(token);
-  if (!result.ok) return result;
+  return apiRequest(async () => {
+    const payload = await httpAuthRequest("/notifications/unread-count", { token });
 
-  return {
-    ok: true,
-    count: result.notifications.filter((notification) => !notification.readAt).length
-  };
+    return {
+      ok: true,
+      count: payload.count || 0
+    };
+  });
 }

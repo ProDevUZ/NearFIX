@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { USER_ROLES } from "../constants/routes";
+import { registerPushTokenApi } from "../services/notifications/notificationService";
 import { useAuthStore } from "../store/authStore";
 import { colors } from "../theme";
 import { AuthNavigator } from "./AuthNavigator";
@@ -21,6 +22,12 @@ export function AppNavigator() {
 
     return () => clearTimeout(fallbackTimer);
   }, [hasHydrated, setHasHydrated]);
+
+  useEffect(() => {
+    if (session?.token) {
+      registerPushTokenApi(session.token);
+    }
+  }, [session?.token]);
 
   if (!hasHydrated) {
     return (

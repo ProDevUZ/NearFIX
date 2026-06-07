@@ -1,13 +1,13 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ArrowRight } from "lucide-react-native";
+import { Check, X } from "lucide-react-native";
 import { colors, iconSizes, radius, shadow } from "../../theme";
 import { OrderResponseTimer } from "./OrderResponseTimer";
 
 const avatarColors = ["#EFE0FF", "#FFD8EB", "#DDEBFF"];
 const textColors = ["#7C3DFF", "#D81B71", "#2868D8"];
 
-export function IncomingOrderCard({ request, disabled, onAccept, index = 0 }) {
+export function IncomingOrderCard({ request, disabled, onAccept, onReject, index = 0 }) {
   const initials = request.clientName
     .split(" ")
     .filter(Boolean)
@@ -17,7 +17,7 @@ export function IncomingOrderCard({ request, disabled, onAccept, index = 0 }) {
     .toUpperCase();
 
   return (
-    <View style={[styles.card, disabled && styles.disabled]}>
+    <View style={styles.card}>
       <View style={styles.topRow}>
         <View style={[styles.clientIcon, { backgroundColor: avatarColors[index % avatarColors.length] }]}>
           <Text style={[styles.avatarText, { color: textColors[index % textColors.length] }]}>{initials || "JP"}</Text>
@@ -29,15 +29,27 @@ export function IncomingOrderCard({ request, disabled, onAccept, index = 0 }) {
           </Text>
         </View>
         <Text style={styles.payment}>{request.estimatedPayment}</Text>
-        <Pressable
-          disabled={disabled}
-          onPress={disabled ? undefined : onAccept}
-          style={({ pressed }) => [styles.acceptButton, disabled && styles.acceptDisabled, pressed && styles.pressed]}
-        >
-          <ArrowRight size={iconSizes.sm} color={colors.white} strokeWidth={2.8} />
-        </Pressable>
       </View>
-      <OrderResponseTimer deadlineAt={request.responseDeadlineAt} compact />
+      <View style={styles.bottomRow}>
+        <OrderResponseTimer deadlineAt={request.responseDeadlineAt} compact />
+        <View style={styles.actions}>
+          <Pressable
+            onPress={onReject}
+            style={({ pressed }) => [styles.actionButton, styles.rejectButton, pressed && styles.pressed]}
+          >
+            <X size={iconSizes.sm} color="#B42318" strokeWidth={2.8} />
+            <Text style={[styles.actionText, styles.rejectText]}>Bekor</Text>
+          </Pressable>
+          <Pressable
+            disabled={disabled}
+            onPress={disabled ? undefined : onAccept}
+            style={({ pressed }) => [styles.actionButton, styles.acceptButton, disabled && styles.acceptDisabled, pressed && styles.pressed]}
+          >
+            <Check size={iconSizes.sm} color={colors.white} strokeWidth={2.8} />
+            <Text style={[styles.actionText, styles.acceptText]}>Qabul</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -58,9 +70,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11
-  },
-  disabled: {
-    opacity: 0.55
   },
   clientIcon: {
     width: 41,
@@ -95,16 +104,47 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: "900"
   },
-  acceptButton: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.pill,
-    backgroundColor: "#18B354",
+  bottomRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "space-between",
+    gap: 10
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  actionButton: {
+    minHeight: 31,
+    borderRadius: radius.pill,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5
+  },
+  acceptButton: {
+    backgroundColor: "#18B354"
+  },
+  rejectButton: {
+    borderWidth: 1,
+    borderColor: "#F3B4AF",
+    backgroundColor: "#FFF5F5"
   },
   acceptDisabled: {
     backgroundColor: colors.subtle
+  },
+  actionText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900"
+  },
+  acceptText: {
+    color: colors.white
+  },
+  rejectText: {
+    color: "#B42318"
   },
   pressed: {
     opacity: 0.78

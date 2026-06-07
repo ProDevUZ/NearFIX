@@ -15,7 +15,7 @@ export type AdminLoginResponse = {
 export async function loginAdmin(phone: string) {
   return apiClient<AdminLoginResponse>("/auth/phone", {
     method: "POST",
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ phone, code: "3243" })
   });
 }
 

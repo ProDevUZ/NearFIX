@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { loginWithPhoneApi, logoutApi, getCurrentUserApi, refreshAccessTokenApi, updateCurrentUserApi } from "../services/auth";
 
+const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
+
 export const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -10,8 +12,8 @@ export const useAuthStore = create(
   invalidation: null,
   hasHydrated: false,
   setHasHydrated: (value) => set({ hasHydrated: value }),
-  loginWithPhone: async (phone, name) => {
-    const apiResult = await loginWithPhoneApi(phone || "+998", name);
+  loginWithPhone: async (phone, name, code) => {
+    const apiResult = await loginWithPhoneApi(phone || "+998", name, code);
     if (!apiResult.ok) return apiResult;
 
     const role = apiResult.user.role;
@@ -137,7 +139,11 @@ export const useAuthStore = create(
   },
   logout: async () => {
     const current = get().session;
-    if (current?.token) await logoutApi(current.token);
+    if (current?.token) {
+      const pushToken = await AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+      await logoutApi(current.token, pushToken);
+      if (pushToken) await AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+    }
 
     set({
       session: null
