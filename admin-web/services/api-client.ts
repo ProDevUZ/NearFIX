@@ -1,4 +1,14 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+if (process.env.NODE_ENV === "production") {
+  if (!API_BASE_URL) {
+    throw new Error("NEXT_PUBLIC_API_URL is required for production builds");
+  }
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(API_BASE_URL)) {
+    throw new Error("NEXT_PUBLIC_API_URL cannot point to localhost in production");
+  }
+}
 
 export class ApiClientError extends Error {
   status: number;

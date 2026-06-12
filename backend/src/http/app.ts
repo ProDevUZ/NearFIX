@@ -1,7 +1,8 @@
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { env } from "../config/env.js";
 import { addressRouter } from "../modules/addresses/address.routes.js";
 import { adminRouter } from "../modules/admin/admin.routes.js";
 import { authRouter } from "../modules/auth/auth.routes.js";
@@ -19,10 +20,43 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadDir = path.resolve(__dirname, "../../uploads");
 
+function normalizeOrigin(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
+const configuredOrigins = new Set(env.CORS_ORIGINS.split(",").map(normalizeOrigin).filter(Boolean));
+
+function isDevelopmentOrigin(origin: string) {
+  if (env.NODE_ENV === "production") return false;
+
+  try {
+    const url = new URL(origin);
+    return ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (!origin || configuredOrigins.has(normalizeOrigin(origin)) || isDevelopmentOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(
+      Object.assign(new Error("Not allowed by CORS"), {
+        status: 403,
+        code: "CORS_ORIGIN_DENIED"
+      })
+    );
+  }
+};
+
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: "1mb" }));
   app.use("/uploads", express.static(uploadDir));
 
