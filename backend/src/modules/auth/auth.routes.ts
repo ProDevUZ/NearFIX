@@ -1,7 +1,21 @@
 import { Router } from "express";
-import { phoneLoginSchema, refreshTokenSchema, updateCurrentUserSchema } from "./auth.contracts.js";
+import {
+  otpRequestSchema,
+  otpVerifySchema,
+  phoneLoginSchema,
+  refreshTokenSchema,
+  updateCurrentUserSchema
+} from "./auth.contracts.js";
 import { authenticate } from "./middleware/auth.middleware.js";
-import { loginOrRegisterWithPhone, refreshAccessToken, revokeSession, updateCurrentUserProfile } from "./auth.service.js";
+import { otpRequestIpRateLimit } from "./middleware/otp-ip-rate-limit.js";
+import {
+  loginOrRegisterWithPhone,
+  refreshAccessToken,
+  requestOtp,
+  revokeSession,
+  updateCurrentUserProfile,
+  verifyOtpAndCreateSession
+} from "./auth.service.js";
 
 export const authRouter = Router();
 
@@ -11,6 +25,35 @@ authRouter.post("/phone", async (request, response, next) => {
     const result = await loginOrRegisterWithPhone(input);
 
     response.status(201).json({
+      ok: true,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      token: result.token,
+      user: result.user
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/otp/request", otpRequestIpRateLimit, async (request, response, next) => {
+  try {
+    const input = otpRequestSchema.parse(request.body);
+    const result = await requestOtp(input);
+
+    response.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/otp/verify", async (request, response, next) => {
+  try {
+    const input = otpVerifySchema.parse(request.body);
+    const result = await verifyOtpAndCreateSession(input);
+
+    response.status(201).json({
+      success: true,
       ok: true,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -32,6 +75,7 @@ authRouter.get("/me", authenticate, (request, response) => {
       phone: user.phone,
       name: user.name,
       role: user.role,
+      permissions: user.permissions,
       sessionVersion: user.sessionVersion
     }
   });

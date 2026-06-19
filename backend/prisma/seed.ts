@@ -9,14 +9,14 @@ async function main() {
     where: { phone: ADMIN_PHONE },
     update: {
       name: "NearFIX Admin",
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
       cityId: null
     },
     create: {
       phone: ADMIN_PHONE,
       name: "NearFIX Admin",
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE
     }
   });

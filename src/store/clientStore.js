@@ -6,6 +6,7 @@ import { TRACKING_STATUSES } from "../constants/orderTracking";
 import { fetchCatalogWorkers } from "../services/catalog/catalogService";
 import { cancelOrderApi, createOrderApi, fetchOrdersApi } from "../services/orders/orderService";
 import { createAddressApi, deleteAddressApi, getAddressesApi, updateAddressApi } from "../services/addresses/addressService";
+import { fetchBannersApi } from "../services/content/bannerService";
 import { addFavoriteApi, fetchFavoritesApi, removeFavoriteApi } from "../services/favorites/favoriteService";
 import { useAuthStore } from "./authStore";
 
@@ -33,6 +34,7 @@ export const useClientStore = create((set, get) => ({
   categories,
   topCategoryIds,
   workers: [],
+  banners: [],
   orders: [],
   activeOrder: null,
   chatMessages: [],
@@ -95,6 +97,17 @@ export const useClientStore = create((set, get) => ({
           lastError: null
         }
       }));
+    }
+
+    return result;
+  },
+  syncBannersFromApi: async () => {
+    const result = await fetchBannersApi();
+
+    if (result.ok) {
+      set({
+        banners: result.banners
+      });
     }
 
     return result;

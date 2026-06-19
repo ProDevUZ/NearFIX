@@ -58,7 +58,8 @@ export async function apiRequest(handler, fallback) {
     return {
       ok: false,
       code: error?.code,
-      message: error?.message || "Unexpected service error"
+      message: error?.message || "Unexpected service error",
+      retryAfter: error?.payload?.retryAfter
     };
   }
 }

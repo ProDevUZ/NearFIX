@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Brush,
   Ellipsis,
@@ -32,8 +32,10 @@ const moreCategoryItem = { id: "more", title: "Ko'proq", icon: Ellipsis, color: 
 
 export function HomeScreen({ navigation }) {
   const session = useAuthStore((state) => state.session);
+  const banners = useClientStore((state) => state.banners);
   const selectedCityId = useClientStore((state) => state.selectedCityId);
   const setSelectedCity = useClientStore((state) => state.setSelectedCity);
+  const syncBannersFromApi = useClientStore((state) => state.syncBannersFromApi);
   const syncCatalogFromApi = useClientStore((state) => state.syncCatalogFromApi);
   const syncOrdersFromApi = useClientStore((state) => state.syncOrdersFromApi);
   const hasCategoryOverflow = categoryItems.length > 8;
@@ -46,17 +48,40 @@ export function HomeScreen({ navigation }) {
   useEffect(() => {
     syncCatalogFromApi();
     syncOrdersFromApi();
-  }, [selectedCityId, syncCatalogFromApi, syncOrdersFromApi]);
+    syncBannersFromApi();
+  }, [selectedCityId, syncBannersFromApi, syncCatalogFromApi, syncOrdersFromApi]);
 
   async function handleRefresh() {
     setRefreshing(true);
-    await Promise.all([syncCatalogFromApi(), syncOrdersFromApi()]);
+    await Promise.all([syncCatalogFromApi(), syncOrdersFromApi(), syncBannersFromApi()]);
     setRefreshing(false);
   }
 
   function openCategory(title) {
     if (title === "Ko'proq" && !hasCategoryOverflow) return;
     navigation.navigate(ROUTES.CATEGORY, title === "Ko'proq" ? undefined : { profession: title });
+  }
+
+  function resolveCategoryTarget(value) {
+    const cleanValue = String(value || "").trim().toLowerCase();
+    const category = categoryItems.find((item) => item.id.toLowerCase() === cleanValue || item.title.toLowerCase() === cleanValue);
+    return category?.title || value;
+  }
+
+  async function handleBannerPress(banner) {
+    if (banner.targetType === "CATEGORY" && banner.targetValue) {
+      navigation.navigate(ROUTES.CATEGORY, { profession: resolveCategoryTarget(banner.targetValue) });
+      return;
+    }
+
+    if (banner.targetType === "URL" && banner.targetValue) {
+      try {
+        const canOpen = await Linking.canOpenURL(banner.targetValue);
+        if (canOpen) await Linking.openURL(banner.targetValue);
+      } catch {
+        // Ignore invalid or unsupported external URLs so Home remains stable.
+      }
+    }
   }
 
   return (
@@ -92,26 +117,18 @@ export function HomeScreen({ navigation }) {
           <CitySelector selectedCityId={selectedCityId} onSelectCity={setSelectedCity} />
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-          contentContainerStyle={styles.bannerTrack}
-        >
-          <PromoCard
-            badge="NEARFIX"
-            title={"Kerakli xizmatni\ntanlang"}
-            body={"Tasdiqlangan ustalar katalogidan\nmos ijrochini toping"}
-            action="Boshlash"
-            primary
-          />
-          <PromoCard
-            badge="ISHONCH"
-            title={"Buyurtma\njarayoni"}
-            body={"Chat, status va tarix backenddan\nyangilanadi"}
-            action="Ko'rish"
-          />
-        </ScrollView>
+        {banners.length ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            bounces={false}
+            contentContainerStyle={styles.bannerTrack}
+          >
+            {banners.map((banner) => (
+              <BannerCard key={banner.id} banner={banner} onPress={() => handleBannerPress(banner)} />
+            ))}
+          </ScrollView>
+        ) : null}
 
         <Pressable onPress={() => navigation.navigate(ROUTES.CATEGORY)} style={styles.searchBox}>
           <Search size={24} color="#75B6D0" strokeWidth={2.7} />
@@ -146,25 +163,20 @@ export function HomeScreen({ navigation }) {
   );
 }
 
-function PromoCard({ badge, title, body, action, primary = false }) {
+function BannerCard({ banner, onPress }) {
   return (
-    <View style={[styles.promoCard, !primary && styles.promoSecondary]}>
-      <View style={styles.promoBadge}>
-        <Text style={styles.promoBadgeText}>{badge}</Text>
-      </View>
-      <Text style={styles.promoTitle}>{title}</Text>
-      <Text style={styles.promoBody}>{body}</Text>
-      <View style={[styles.promoButton, !primary && styles.promoButtonDark]}>
-        <Text style={styles.promoButtonText}>{action}</Text>
-      </View>
-      {primary ? (
-        <>
-          <View style={styles.decorCircleLarge} />
-          <View style={styles.decorCircleSmall} />
-          <View style={styles.decorStripe} />
-        </>
-      ) : null}
-    </View>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.promoCard, pressed && styles.pressed]}>
+      {banner.imageUrl ? (
+        <ImageBackground source={{ uri: banner.imageUrl }} resizeMode="cover" style={styles.bannerImage}>
+          <View style={styles.bannerScrim} />
+          <Text style={styles.bannerTitle} numberOfLines={2}>{banner.title}</Text>
+        </ImageBackground>
+      ) : (
+        <View style={styles.bannerFallback}>
+          <Text style={styles.bannerTitle} numberOfLines={2}>{banner.title}</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -275,10 +287,32 @@ const styles = StyleSheet.create({
     width: 290,
     height: 190,
     borderRadius: 22,
-    paddingTop: 20,
-    paddingLeft: 24,
     backgroundColor: "#19A4B4",
     overflow: "hidden"
+  },
+  bannerImage: {
+    flex: 1,
+    padding: 22,
+    justifyContent: "flex-end"
+  },
+  bannerScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(31,78,106,0.22)"
+  },
+  bannerFallback: {
+    flex: 1,
+    padding: 22,
+    justifyContent: "flex-end",
+    backgroundColor: "#19A4B4"
+  },
+  bannerTitle: {
+    color: "#FFFFFF",
+    fontSize: 25,
+    lineHeight: 31,
+    fontFamily: font.extra
+  },
+  pressed: {
+    opacity: 0.78
   },
   promoSecondary: {
     width: 215,

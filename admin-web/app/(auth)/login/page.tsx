@@ -8,14 +8,19 @@ import { Input } from "@/components/ui/input";
 import { useAdminSessionStore } from "@/stores/admin-session-store";
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState("+998900000001");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const loginWithPhone = useAdminSessionStore((state) => state.loginWithPhone);
+  const login = useAdminSessionStore((state) => state.login);
 
-  async function handleLogin() {
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError("");
-    const result = await loginWithPhone(phone);
+    setIsSubmitting(true);
+    const result = await login(username, password);
+    setIsSubmitting(false);
     if (result.ok) router.replace("/dashboard");
     else setError(result.message || "Login failed");
   }
@@ -26,15 +31,29 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>NearFIX Admin</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Operatsion panelga kirish. Auth backend keyingi bosqichda ulanadi.
+            Admin username va password bilan operatsion panelga kiring.
           </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Input onChange={(event) => setPhone(event.target.value)} placeholder="Telefon" value={phone} />
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
-          <Button className="w-full" onClick={handleLogin}>
-            Kirish
-          </Button>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handleLogin}>
+            <Input
+              autoComplete="username"
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Username"
+              value={username}
+            />
+            <Input
+              autoComplete="current-password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              type="password"
+              value={password}
+            />
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            <Button className="w-full" disabled={isSubmitting || !username || !password} type="submit">
+              {isSubmitting ? "Kirilmoqda..." : "Kirish"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </main>

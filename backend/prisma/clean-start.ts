@@ -38,7 +38,7 @@ async function main() {
       data: {
         phone: ADMIN_PHONE,
         name: "NearFIX Admin",
-        role: UserRole.ADMIN,
+        role: UserRole.SUPER_ADMIN,
         status: UserStatus.ACTIVE
       }
     });

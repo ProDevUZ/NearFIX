@@ -1,23 +1,25 @@
 import { apiRequest, httpRequest } from "../api/client";
 
-export async function requestSmsCode(phone, role) {
-  return apiRequest(async () => ({
-    ok: true,
-    message: "Auth integration is planned for the next stage.",
-    phone,
-    role
-  }));
+export async function requestOtp(phone) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/otp/request", {
+      method: "POST",
+      body: { phone }
+    });
+
+    return {
+      ok: true,
+      expiresIn: payload.expiresIn,
+      resendIn: payload.resendIn
+    };
+  });
 }
 
-export async function loginWithPhoneApi(phone, name, code) {
+export async function verifyOtp(phone, code) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/phone", {
+    const payload = await httpRequest("/auth/otp/verify", {
       method: "POST",
-      body: {
-        phone,
-        ...(name ? { name } : {}),
-        ...(code ? { code } : {})
-      }
+      body: { phone, code }
     });
 
     return {
@@ -43,21 +45,6 @@ export async function updateCurrentUserApi(token, profile) {
       user: payload.user
     };
   });
-}
-
-export async function verifySmsCode(phone, code) {
-  return apiRequest(async () => ({
-    ok: code.length >= 4,
-    phone,
-    sessionToken: null
-  }));
-}
-
-export async function getCurrentUser() {
-  return apiRequest(async () => ({
-    ok: false,
-    user: null
-  }));
 }
 
 export async function getCurrentUserApi(token) {

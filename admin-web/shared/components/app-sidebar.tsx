@@ -2,19 +2,62 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, LayoutDashboard, Star, Users, Wrench } from "lucide-react";
+import { ClipboardList, Images, LayoutDashboard, Shield, Star, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hasPermission, isSuperAdmin, type AdminPermission } from "@/shared/auth/permissions";
+import { useAdminSessionStore } from "@/stores/admin-session-store";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/orders", label: "Orders", icon: ClipboardList },
-  { href: "/workers", label: "Workers", icon: Wrench },
-  { href: "/users", label: "Users", icon: Users },
-  { href: "/reviews", label: "Reviews", icon: Star }
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "analytics.read" },
+  { href: "/orders", label: "Orders", icon: ClipboardList, permission: "orders.read" },
+  { href: "/workers", label: "Workers", icon: Wrench, permission: "workers.read" },
+  { href: "/users", label: "Users", icon: Users, permission: "users.read" },
+  { href: "/reviews", label: "Reviews", icon: Star, permission: "reviews.read" }
+] satisfies {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permission: AdminPermission;
+}[];
+
+const contentNavItems = [
+  { href: "/content/banners", label: "Banners", icon: Images, permission: "content.read" }
+] satisfies {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permission: AdminPermission;
+}[];
+
+const systemNavItems = [
+  { href: "/system/admins", label: "Admins", icon: Shield }
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const session = useAdminSessionStore((state) => state.session);
+  const visibleNavItems = navItems.filter((item) => hasPermission(session, item.permission));
+  const visibleContentNavItems = contentNavItems.filter((item) => hasPermission(session, item.permission));
+  const visibleSystemNavItems = isSuperAdmin(session) ? systemNavItems : [];
+
+  function renderLink(item: { href: string; label: string; icon: typeof LayoutDashboard }) {
+    const Icon = item.icon;
+    const active = pathname === item.href;
+
+    return (
+      <Link
+        className={cn(
+          "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+          active && "bg-primary/10 text-primary"
+        )}
+        href={item.href}
+        key={item.href}
+      >
+        <Icon className="h-4 w-4" />
+        {item.label}
+      </Link>
+    );
+  }
 
   return (
     <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r bg-card">
@@ -26,24 +69,23 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
-
-          return (
-            <Link
-              className={cn(
-                "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                active && "bg-primary/10 text-primary"
-              )}
-              href={item.href}
-              key={item.href}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+        {visibleNavItems.map(renderLink)}
+        {visibleContentNavItems.length ? (
+          <>
+            <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Content
+            </div>
+            {visibleContentNavItems.map(renderLink)}
+          </>
+        ) : null}
+        {visibleSystemNavItems.length ? (
+          <>
+            <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              System
+            </div>
+            {visibleSystemNavItems.map(renderLink)}
+          </>
+        ) : null}
       </nav>
 
       <div className="border-t p-4">

@@ -1,11 +1,24 @@
-import React, { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { ShieldCheck, Smartphone, Wrench } from "lucide-react-native";
 import { Brand } from "../../components/ui/Brand";
 import { PrimaryButton } from "../../components/ui/Button";
-import { requestSmsCode } from "../../services/auth";
+import { requestOtp } from "../../services/auth";
 import { useAuthStore } from "../../store/authStore";
 import { colors, iconSizes, radius, shadow } from "../../theme";
+
+const OTP_ERROR_MESSAGES = {
+  OTP_INVALID: "Tasdiqlash kodi noto'g'ri.",
+  OTP_EXPIRED: "Tasdiqlash kodining muddati tugagan. Yangi kod so'rang.",
+  OTP_LOCKED: "Juda ko'p noto'g'ri urinish bo'ldi. Yangi kod so'rang.",
+  OTP_COOLDOWN: "Yangi kod yuborish uchun biroz kuting.",
+  OTP_RATE_LIMITED: "Juda ko'p kod so'raldi. Keyinroq qayta urinib ko'ring.",
+  SMS_SEND_FAILED: "SMS yuborilmadi. Keyinroq qayta urinib ko'ring."
+};
+
+function authErrorMessage(result, fallback) {
+  return OTP_ERROR_MESSAGES[result?.code] || result?.message || fallback;
+}
 
 export function LoginScreen() {
   const [phone, setPhone] = useState("");
@@ -14,8 +27,21 @@ export function LoginScreen() {
   const [otpRequested, setOtpRequested] = useState(false);
   const [verifiedPhone, setVerifiedPhone] = useState("");
   const [verifiedName, setVerifiedName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const loginWithPhone = useAuthStore((state) => state.loginWithPhone);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const verifyOtp = useAuthStore((state) => state.verifyOtp);
+  const submitting = requestLoading || verifyLoading;
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+
+    const timer = setInterval(() => {
+      setResendSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendSeconds]);
 
   function normalizePhone(value) {
     return value.trim().startsWith("+") ? value.trim() : `+998${value.replace(/[^\d]/g, "")}`;
@@ -36,34 +62,65 @@ export function LoginScreen() {
       return;
     }
 
-    setSubmitting(true);
-    try {
-      if (otpRequested && cleanPhone === verifiedPhone && cleanName === verifiedName) {
-        const code = otpCode.trim();
-        if (code.length < 4) {
-          Alert.alert("OTP kod kerak", "SMS orqali kelgan 4 xonali kodni kiriting.");
-          return;
-        }
+    if (otpRequested && cleanPhone === verifiedPhone && cleanName === verifiedName) {
+      const code = otpCode.trim();
+      if (!/^\d{4}$/.test(code)) {
+        Alert.alert("OTP kod kerak", "SMS orqali kelgan 4 xonali kodni kiriting.");
+        return;
+      }
 
-        const loginResult = await loginWithPhone(cleanPhone, cleanName, code);
+      setVerifyLoading(true);
+      try {
+        const loginResult = await verifyOtp(cleanPhone, code, cleanName);
         if (!loginResult.ok) {
-          Alert.alert("Login amalga oshmadi", loginResult.message || "Backend bilan ulanishda xatolik yuz berdi.");
+          Alert.alert("Login amalga oshmadi", authErrorMessage(loginResult, "Backend bilan ulanishda xatolik yuz berdi."));
         }
-        return;
+      } finally {
+        setVerifyLoading(false);
       }
+      return;
+    }
 
-      const smsResult = await requestSmsCode(cleanPhone);
+    setRequestLoading(true);
+    try {
+      const smsResult = await requestOtp(cleanPhone);
       if (!smsResult.ok) {
-        Alert.alert("SMS yuborilmadi", smsResult.message || "Qayta urinib ko'ring.");
+        if (smsResult.code === "OTP_COOLDOWN" && smsResult.retryAfter) {
+          setResendSeconds(smsResult.retryAfter);
+        }
+        Alert.alert("SMS yuborilmadi", authErrorMessage(smsResult, "Qayta urinib ko'ring."));
         return;
       }
 
+      setResendSeconds(smsResult.resendIn || 0);
       setVerifiedPhone(cleanPhone);
       setVerifiedName(cleanName);
       setOtpRequested(true);
       setOtpCode("");
     } finally {
-      setSubmitting(false);
+      setRequestLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (submitting || resendSeconds > 0) return;
+
+    setRequestLoading(true);
+    try {
+      const result = await requestOtp(verifiedPhone);
+      if (!result.ok) {
+        if (result.code === "OTP_COOLDOWN" && result.retryAfter) {
+          setResendSeconds(result.retryAfter);
+        }
+        Alert.alert("SMS yuborilmadi", authErrorMessage(result, "Qayta urinib ko'ring."));
+        return;
+      }
+
+      setOtpCode("");
+      setResendSeconds(result.resendIn || 0);
+      Alert.alert("Kod yuborildi", "Yangi tasdiqlash kodi SMS orqali yuborildi.");
+    } finally {
+      setRequestLoading(false);
     }
   }
 
@@ -98,6 +155,7 @@ export function LoginScreen() {
             placeholderTextColor={colors.subtle}
             style={styles.input}
             value={name}
+            editable={!submitting}
             onChangeText={(value) => {
               setName(value);
               setOtpRequested(false);
@@ -116,6 +174,7 @@ export function LoginScreen() {
               placeholderTextColor={colors.subtle}
               style={styles.input}
               value={phone}
+              editable={!submitting}
               onChangeText={(value) => {
                 setPhone(value);
                 setOtpRequested(false);
@@ -129,19 +188,29 @@ export function LoginScreen() {
               <Text style={styles.inputLabel}>OTP kod</Text>
               <TextInput
                 keyboardType="number-pad"
-                maxLength={8}
-                placeholder="3243"
+                maxLength={4}
+                placeholder="SMS kodi"
                 placeholderTextColor={colors.subtle}
                 style={styles.input}
                 value={otpCode}
+                editable={!submitting}
                 onChangeText={setOtpCode}
               />
+              <Pressable disabled={submitting || resendSeconds > 0} onPress={handleResend}>
+                <Text style={[styles.resendText, (submitting || resendSeconds > 0) && styles.resendTextDisabled]}>
+                  {requestLoading
+                    ? "Yuborilmoqda..."
+                    : resendSeconds > 0
+                      ? `Qayta yuborish (${resendSeconds})`
+                      : "Qayta yuborish"}
+                </Text>
+              </Pressable>
             </>
           ) : null}
         </View>
 
         <PrimaryButton
-          title={submitting ? "Kutilmoqda..." : otpRequested ? "Kirish" : "OTP kod olish"}
+          title={requestLoading ? "SMS yuborilmoqda..." : verifyLoading ? "Tekshirilmoqda..." : otpRequested ? "Kirish" : "OTP kod olish"}
           onPress={handleContinue}
         />
         <Text style={styles.demoHint}>Rol backend/admin tomonidan sessiyaga bog'lanadi.</Text>
@@ -256,6 +325,16 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: "600"
+  },
+  resendText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+    paddingVertical: 6
+  },
+  resendTextDisabled: {
+    color: colors.subtle
   },
   terms: {
     textAlign: "center",

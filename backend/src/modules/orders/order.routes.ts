@@ -1,5 +1,6 @@
 import { Router, type Request } from "express";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
+import { requireAdminPermissionIfAdmin, requirePermission } from "../auth/middleware/permission.guard.js";
 import { requireRole } from "../auth/middleware/role.guard.js";
 import { cancelOrderSchema, createOrderSchema, rejectOrderSchema, transitionOrderSchema } from "./order.contracts.js";
 import { createReviewSchema } from "../reviews/review.contracts.js";
@@ -22,7 +23,7 @@ function getOrderId(request: Request) {
   return String(request.params.orderId);
 }
 
-orderRouter.post("/system/expire-waiting", authenticate, requireRole("ADMIN"), async (_request, response, next) => {
+orderRouter.post("/system/expire-waiting", authenticate, requireRole("ADMIN"), requirePermission("orders.manage"), async (_request, response, next) => {
   try {
     const result = await autoCancelExpiredWaitingOrders();
 
@@ -75,7 +76,7 @@ orderRouter.get("/worker/incoming", authenticate, requireRole("PROVIDER"), async
   }
 });
 
-orderRouter.get("/:orderId", authenticate, async (request, response, next) => {
+orderRouter.get("/:orderId", authenticate, requireAdminPermissionIfAdmin("orders.read"), async (request, response, next) => {
   try {
     const order = await getOrderForUser(request.user!, getOrderId(request));
 
@@ -88,7 +89,7 @@ orderRouter.get("/:orderId", authenticate, async (request, response, next) => {
   }
 });
 
-orderRouter.post("/:orderId/accept", authenticate, async (request, response, next) => {
+orderRouter.post("/:orderId/accept", authenticate, requireAdminPermissionIfAdmin("orders.manage"), async (request, response, next) => {
   try {
     const order = await acceptOrder(request.user!, getOrderId(request));
 
@@ -115,7 +116,7 @@ orderRouter.post("/:orderId/reject", authenticate, requireRole("PROVIDER"), asyn
   }
 });
 
-orderRouter.post("/:orderId/status", authenticate, async (request, response, next) => {
+orderRouter.post("/:orderId/status", authenticate, requireAdminPermissionIfAdmin("orders.manage"), async (request, response, next) => {
   try {
     const input = transitionOrderSchema.parse(request.body);
     const order = await transitionOrder(request.user!, getOrderId(request), input.status);
@@ -144,7 +145,7 @@ orderRouter.post("/:orderId/review", authenticate, async (request, response, nex
   }
 });
 
-orderRouter.post("/:orderId/cancel", authenticate, async (request, response, next) => {
+orderRouter.post("/:orderId/cancel", authenticate, requireAdminPermissionIfAdmin("orders.manage"), async (request, response, next) => {
   try {
     const input = cancelOrderSchema.parse(request.body);
     const order = await cancelOrder(request.user!, getOrderId(request), input.reason);

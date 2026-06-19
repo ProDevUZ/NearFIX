@@ -1,18 +1,14 @@
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { MediaScope } from "@prisma/client";
 import { Router } from "express";
 import multer from "multer";
+import {
+  createR2ObjectKey,
+  deleteObjectFromR2,
+  type R2ObjectPrefix,
+  uploadObjectToR2
+} from "../../storage/r2.storage.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { createUploadedMedia } from "./media.service.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.resolve(__dirname, "../../../uploads");
-
-fs.mkdirSync(uploadDir, { recursive: true });
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -28,16 +24,8 @@ const allowedMimeTypes = new Set([
   "video/webm"
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_request, _file, callback) => callback(null, uploadDir),
-  filename: (_request, file, callback) => {
-    const extension = path.extname(file.originalname || "").toLowerCase();
-    callback(null, `${Date.now()}-${randomUUID()}${extension}`);
-  }
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 100 * 1024 * 1024
   },
@@ -67,6 +55,12 @@ function normalizeMimeType(value: string) {
   return mimeType;
 }
 
+function resolveObjectPrefix(scope?: MediaScope): R2ObjectPrefix {
+  if (scope === MediaScope.WORKER_GALLERY) return "media/workers";
+  if (scope === MediaScope.ORDER_PROBLEM || scope === MediaScope.REVIEW) return "media/orders";
+  return "media/chat";
+}
+
 export const mediaRouter = Router();
 
 mediaRouter.post("/upload", authenticate, upload.single("file"), async (request, response, next) => {
@@ -80,16 +74,31 @@ mediaRouter.post("/upload", authenticate, upload.single("file"), async (request,
       });
     }
 
-    const url = `${request.protocol}://${request.get("host")}/uploads/${file.filename}`;
-    const media = await createUploadedMedia(request.user!, {
-      roomId: typeof request.body.roomId === "string" ? request.body.roomId : undefined,
-      orderId: typeof request.body.orderId === "string" ? request.body.orderId : undefined,
-      scope: resolveScope(request.body.scope),
-      url,
-      fileName: file.originalname,
-      mimeType: normalizeMimeType(file.mimetype),
-      size: file.size
+    const scope = resolveScope(request.body.scope);
+    const mimeType = normalizeMimeType(file.mimetype);
+    const objectKey = createR2ObjectKey(resolveObjectPrefix(scope), file.originalname, mimeType);
+    const uploaded = await uploadObjectToR2({
+      objectKey,
+      body: file.buffer,
+      contentType: mimeType,
+      contentLength: file.size
     });
+
+    let media;
+    try {
+      media = await createUploadedMedia(request.user!, {
+        roomId: typeof request.body.roomId === "string" ? request.body.roomId : undefined,
+        orderId: typeof request.body.orderId === "string" ? request.body.orderId : undefined,
+        scope,
+        url: uploaded.url,
+        fileName: file.originalname,
+        mimeType,
+        size: file.size
+      });
+    } catch (error) {
+      await deleteObjectFromR2(objectKey).catch(() => undefined);
+      throw error;
+    }
 
     response.json({ ok: true, media });
   } catch (error) {

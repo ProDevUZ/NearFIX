@@ -11,6 +11,7 @@ enum UserRole {
   CLIENT
   PROVIDER
   ADMIN
+  SUPER_ADMIN
 }
 
 enum UserStatus {
@@ -88,6 +89,12 @@ enum MediaStatus {
   DELETED
 }
 
+enum BannerTargetType {
+  NONE
+  CATEGORY
+  URL
+}
+
 enum ChatMessageType {
   TEXT
   IMAGE
@@ -147,6 +154,7 @@ model User {
   updatedAt      DateTime   @updatedAt
 
   sessions        Session[]
+  adminPermissions AdminPermission[]
   workerProfile   WorkerProfile?
   addresses       Address[]
   clientOrders    Order[]           @relation("ClientOrders")
@@ -162,6 +170,18 @@ model User {
   supportTickets  SupportTicket[]
 }
 
+model AdminPermission {
+  id         String   @id @default(cuid())
+  userId     String
+  permission String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([permission])
+}
+
 model Session {
   id           String   @id @default(cuid())
   userId       String
@@ -175,6 +195,24 @@ model Session {
   @@index([userId])
   @@index([refreshToken])
   @@index([revoked])
+}
+
+model OtpChallenge {
+  id                String    @id @default(cuid())
+  phone             String
+  codeHash          String
+  expiresAt         DateTime
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(5)
+  consumedAt        DateTime?
+  resendAfter       DateTime
+  providerMessageId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([phone])
+  @@index([expiresAt])
+  @@index([consumedAt])
 }
 
 model WorkerProfile {
@@ -403,6 +441,21 @@ model Media {
   @@index([roomId])
   @@index([orderId])
   @@index([scope])
+}
+
+model Banner {
+  id          String           @id @default(cuid())
+  title       String
+  imageUrl    String
+  targetType  BannerTargetType @default(NONE)
+  targetValue String?
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([sortOrder])
 }
 
 model Payment {

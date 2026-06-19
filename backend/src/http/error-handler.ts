@@ -24,6 +24,7 @@ export const errorHandler: ErrorRequestHandler = (error, request, response, _nex
   response.status(status).json({
     ok: false,
     code: error?.code || "INTERNAL_ERROR",
-    message: error?.message || "Unexpected server error"
+    message: error?.message || "Unexpected server error",
+    ...(typeof error?.retryAfter === "number" ? { retryAfter: error.retryAfter } : {})
   });
 };

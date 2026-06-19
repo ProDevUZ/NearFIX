@@ -1,11 +1,11 @@
 import type { RequestHandler } from "express";
 import { bearerTokenSchema } from "../auth.contracts.js";
-import { getSessionUser } from "../auth.service.js";
+import { requireAuth } from "../auth-context.js";
 
 export const authenticate: RequestHandler = async (request, _response, next) => {
   try {
     const accessToken = bearerTokenSchema.parse(request.headers.authorization || "");
-    const user = await getSessionUser(accessToken);
+    const user = await requireAuth(request);
 
     request.accessToken = accessToken;
     request.user = user;

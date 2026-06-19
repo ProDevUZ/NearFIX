@@ -1,9 +1,11 @@
-import { Prisma, UserRole } from "@prisma/client";
+import { Prisma, UserRole, UserStatus } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
 import { normalizePhone } from "../../utils/phone.js";
-import { FakeAuthProvider } from "./providers/fake.provider.js";
+import { otpService, type OtpService } from "./otp.service.js";
 import type { AuthProvider } from "./providers/auth-provider.interface.js";
+import { createAuthProvider } from "./providers/provider.factory.js";
+import { ADMIN_PERMISSIONS, type AdminPermission, isAdminRole, isSuperAdminRole } from "./permissions.js";
 import {
   addDays,
   createAccessToken,
@@ -18,10 +20,88 @@ type LoginInput = {
   code?: string;
 };
 
-const defaultAuthProvider = new FakeAuthProvider();
+const defaultAuthProvider = createAuthProvider();
 
 function isTestOtpAllowed() {
   return env.NODE_ENV !== "production";
+}
+
+type UserWithPermissions = {
+  id: string;
+  phone: string;
+  name: string | null;
+  role: UserRole;
+  status: UserStatus;
+  sessionVersion: number;
+  adminPermissions?: { permission: string }[];
+};
+
+function permissionsForUser(user: UserWithPermissions): AdminPermission[] {
+  if (isSuperAdminRole(user.role)) return [...ADMIN_PERMISSIONS];
+  if (!isAdminRole(user.role)) return [];
+  return (user.adminPermissions || [])
+    .map((item) => item.permission)
+    .filter((permission): permission is AdminPermission => (ADMIN_PERMISSIONS as readonly string[]).includes(permission));
+}
+
+function toAuthUser(user: UserWithPermissions) {
+  return {
+    id: user.id,
+    phone: user.phone,
+    name: user.name,
+    role: user.role.toLowerCase(),
+    permissions: permissionsForUser(user),
+    sessionVersion: user.sessionVersion
+  };
+}
+
+async function createSessionForPhone(input: { phone: string; name?: string }) {
+  const phone = normalizePhone(input.phone);
+
+  const user = await prisma.user.upsert({
+    where: { phone },
+    update: input.name ? { name: input.name } : {},
+    create: {
+      phone,
+      name: input.name,
+      role: UserRole.CLIENT
+    },
+    include: {
+      adminPermissions: true
+    }
+  });
+
+  if (user.status !== UserStatus.ACTIVE) {
+    throw Object.assign(new Error("User account is blocked"), {
+      status: 403,
+      code: "USER_BLOCKED"
+    });
+  }
+
+  const refreshToken = createRefreshToken();
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  const expiresAt = addDays(new Date(), env.SESSION_TTL_DAYS);
+
+  const session = await prisma.session.create({
+    data: {
+      userId: user.id,
+      refreshToken: refreshTokenHash,
+      expiresAt
+    }
+  });
+
+  const accessToken = createAccessToken({
+    userId: user.id,
+    sessionId: session.id,
+    sessionVersion: user.sessionVersion
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    token: accessToken,
+    user: toAuthUser(user)
+  };
 }
 
 export async function loginOrRegisterWithPhone(input: LoginInput, authProvider: AuthProvider = defaultAuthProvider) {
@@ -46,56 +126,41 @@ export async function loginOrRegisterWithPhone(input: LoginInput, authProvider: 
     });
   }
 
-  const user = await prisma.user.upsert({
-    where: { phone },
-    update: input.name ? { name: input.name } : {},
-    create: {
-      phone,
-      name: input.name,
-      role: UserRole.CLIENT
-    }
-  });
+  return createSessionForPhone({ phone, name: input.name });
+}
 
-  const refreshToken = createRefreshToken();
-  const refreshTokenHash = hashRefreshToken(refreshToken);
-  const expiresAt = addDays(new Date(), env.SESSION_TTL_DAYS);
+export async function requestOtp(input: { phone: string }, authProvider: AuthProvider = defaultAuthProvider, service: OtpService = otpService) {
+  const phone = normalizePhone(input.phone);
+  const { challenge, code } = await service.createChallenge(phone);
+  const deliveryResult = await authProvider.sendOtp(phone, code);
 
-  const session = await prisma.session.create({
-    data: {
-      userId: user.id,
-      refreshToken: refreshTokenHash,
-      expiresAt
-    }
-  });
-
-  const accessToken = createAccessToken({
-    userId: user.id,
-    sessionId: session.id,
-    sessionVersion: user.sessionVersion
-  });
-
-  const responseUser = {
-    id: user.id,
-    phone: user.phone,
-    name: user.name,
-    role: user.role.toLowerCase(),
-    sessionVersion: user.sessionVersion
-  };
+  await service.setProviderMessageId(challenge.id, deliveryResult?.providerMessageId);
 
   return {
-    accessToken,
-    refreshToken,
-    token: accessToken,
-    user: responseUser
+    success: true,
+    expiresIn: service.ttlSeconds,
+    resendIn: service.resendCooldownSeconds
   };
 }
+
+export async function verifyOtpAndCreateSession(input: { phone: string; code: string }, service: OtpService = otpService) {
+  const phone = normalizePhone(input.phone);
+  await service.verifyChallenge(phone, input.code);
+
+  return createSessionForPhone({ phone });
+}
+
+export async function createAuthSessionForPhone(input: { phone: string; name?: string }) {
+  return createSessionForPhone(input);
+}
+
 
 export async function getSessionUser(rawToken: string) {
   const payload = verifyAccessToken(rawToken);
 
   const session = await prisma.session.findUnique({
     where: { id: payload.sessionId },
-    include: { user: true }
+    include: { user: { include: { adminPermissions: true } } }
   });
 
   if (!session || session.revoked || session.expiresAt <= new Date()) {
@@ -112,13 +177,16 @@ export async function getSessionUser(rawToken: string) {
     });
   }
 
+  if (session.user.status !== UserStatus.ACTIVE) {
+    throw Object.assign(new Error("User account is blocked"), {
+      status: 403,
+      code: "USER_BLOCKED"
+    });
+  }
+
   return {
-    id: session.user.id,
+    ...toAuthUser(session.user),
     sessionId: session.id,
-    phone: session.user.phone,
-    name: session.user.name,
-    role: session.user.role.toLowerCase(),
-    sessionVersion: session.user.sessionVersion
   };
 }
 
@@ -141,16 +209,13 @@ export async function updateCurrentUserProfile(userId: string, input: { name: st
     where: { id: userId },
     data: {
       name: input.name.trim()
+    },
+    include: {
+      adminPermissions: true
     }
   });
 
-  return {
-    id: user.id,
-    phone: user.phone,
-    name: user.name,
-    role: user.role.toLowerCase(),
-    sessionVersion: user.sessionVersion
-  };
+  return toAuthUser(user);
 }
 
 export async function refreshAccessToken(rawRefreshToken: string) {
@@ -158,13 +223,20 @@ export async function refreshAccessToken(rawRefreshToken: string) {
 
   const session = await prisma.session.findUnique({
     where: { refreshToken: refreshTokenHash },
-    include: { user: true }
+    include: { user: { include: { adminPermissions: true } } }
   });
 
   if (!session || session.revoked || session.expiresAt <= new Date()) {
     throw Object.assign(new Error("Refresh session is expired or revoked"), {
       status: 401,
       code: "REFRESH_SESSION_INVALID"
+    });
+  }
+
+  if (session.user.status !== UserStatus.ACTIVE) {
+    throw Object.assign(new Error("User account is blocked"), {
+      status: 403,
+      code: "USER_BLOCKED"
     });
   }
 
@@ -177,13 +249,7 @@ export async function refreshAccessToken(rawRefreshToken: string) {
   return {
     accessToken,
     token: accessToken,
-    user: {
-      id: session.user.id,
-      phone: session.user.phone,
-      name: session.user.name,
-      role: session.user.role.toLowerCase(),
-      sessionVersion: session.user.sessionVersion
-    }
+    user: toAuthUser(session.user)
   };
 }
 

@@ -1,8 +1,22 @@
 export function normalizePhone(phone: string) {
-  const clean = phone.replace(/[^\d+]/g, "");
+  const trimmed = phone.trim();
 
-  if (clean.startsWith("+")) return clean;
-  if (clean.startsWith("998")) return `+${clean}`;
+  if (!/^\+?[\d\s()-]+$/.test(trimmed) || (trimmed.includes("+") && !trimmed.startsWith("+"))) {
+    throw Object.assign(new Error("Invalid phone number"), {
+      status: 400,
+      code: "INVALID_PHONE_NUMBER"
+    });
+  }
 
-  return clean;
+  const digits = phone.replace(/\D/g, "");
+  const normalizedDigits = digits.startsWith("998") ? digits : `998${digits}`;
+
+  if (!/^998\d{9}$/.test(normalizedDigits)) {
+    throw Object.assign(new Error("Invalid phone number"), {
+      status: 400,
+      code: "INVALID_PHONE_NUMBER"
+    });
+  }
+
+  return `+${normalizedDigits}`;
 }

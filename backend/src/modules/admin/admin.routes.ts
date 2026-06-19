@@ -2,6 +2,7 @@ import { Router } from "express";
 import { OrderStatus, type Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
+import { requirePermission } from "../auth/middleware/permission.guard.js";
 import { requireRole } from "../auth/middleware/role.guard.js";
 import { approveWorkerSchema, promoteProviderSchema, workerModerationSchema } from "./admin.contracts.js";
 import {
@@ -91,7 +92,7 @@ function buildAdminOrdersWhere(query: Record<string, unknown>): Prisma.OrderWher
   };
 }
 
-adminRouter.get("/dashboard", async (request, response, next) => {
+adminRouter.get("/dashboard", requirePermission("analytics.read"), async (request, response, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -120,7 +121,7 @@ adminRouter.get("/dashboard", async (request, response, next) => {
   }
 });
 
-adminRouter.get("/users", async (request, response, next) => {
+adminRouter.get("/users", requirePermission("users.read"), async (request, response, next) => {
   try {
     const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
     response.json({ ok: true, users });
@@ -129,7 +130,7 @@ adminRouter.get("/users", async (request, response, next) => {
   }
 });
 
-adminRouter.get("/workers", async (request, response, next) => {
+adminRouter.get("/workers", requirePermission("workers.read"), async (request, response, next) => {
   try {
     const workers = await prisma.workerProfile.findMany({
       include: { user: true, availability: true },
@@ -141,7 +142,7 @@ adminRouter.get("/workers", async (request, response, next) => {
   }
 });
 
-adminRouter.get("/orders", async (request, response, next) => {
+adminRouter.get("/orders", requirePermission("orders.read"), async (request, response, next) => {
   try {
     const page = readPositiveInteger(request.query.page, 1);
     const limit = readPositiveInteger(request.query.limit, 20, maxAdminOrdersLimit);
@@ -173,7 +174,7 @@ adminRouter.get("/orders", async (request, response, next) => {
   }
 });
 
-adminRouter.get("/reviews", async (request, response, next) => {
+adminRouter.get("/reviews", requirePermission("reviews.read"), async (request, response, next) => {
   try {
     const reviews = await prisma.review.findMany({
       include: {
@@ -188,10 +189,10 @@ adminRouter.get("/reviews", async (request, response, next) => {
   }
 });
 
-adminRouter.post("/users/:userId/promote-provider", async (request, response, next) => {
+adminRouter.post("/users/:userId/promote-provider", requirePermission("users.manage"), async (request, response, next) => {
   try {
     const input = promoteProviderSchema.parse(request.body);
-    const user = await promoteUserToProvider(request.params.userId, input);
+    const user = await promoteUserToProvider(String(request.params.userId), input);
 
     response.json({
       ok: true,
@@ -208,10 +209,10 @@ adminRouter.post("/users/:userId/promote-provider", async (request, response, ne
   }
 });
 
-adminRouter.post("/workers/:workerId/approve", async (request, response, next) => {
+adminRouter.post("/workers/:workerId/approve", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = approveWorkerSchema.parse(request.body);
-    const worker = await approveWorkerProfile(request.params.workerId, input);
+    const worker = await approveWorkerProfile(String(request.params.workerId), input);
 
     response.json({
       ok: true,
@@ -223,10 +224,10 @@ adminRouter.post("/workers/:workerId/approve", async (request, response, next) =
   }
 });
 
-adminRouter.post("/workers/:workerId/reject", async (request, response, next) => {
+adminRouter.post("/workers/:workerId/reject", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await rejectWorkerProfile(request.params.workerId, input.reason);
+    const worker = await rejectWorkerProfile(String(request.params.workerId), input.reason);
 
     response.json({
       ok: true,
@@ -238,10 +239,10 @@ adminRouter.post("/workers/:workerId/reject", async (request, response, next) =>
   }
 });
 
-adminRouter.post("/workers/:workerId/suspend", async (request, response, next) => {
+adminRouter.post("/workers/:workerId/suspend", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await suspendWorkerProfile(request.params.workerId, input.reason);
+    const worker = await suspendWorkerProfile(String(request.params.workerId), input.reason);
 
     response.json({
       ok: true,
@@ -253,10 +254,10 @@ adminRouter.post("/workers/:workerId/suspend", async (request, response, next) =
   }
 });
 
-adminRouter.post("/workers/:workerId/unsuspend", async (request, response, next) => {
+adminRouter.post("/workers/:workerId/unsuspend", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await unsuspendWorkerProfile(request.params.workerId, input.reason);
+    const worker = await unsuspendWorkerProfile(String(request.params.workerId), input.reason);
 
     response.json({
       ok: true,

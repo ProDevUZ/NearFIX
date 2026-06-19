@@ -339,7 +339,17 @@ export async function approveWorkerProfile(workerId: string, patch: WorkerProfil
 
     await tx.user.update({
       where: { id: worker.userId },
-      data: { role: UserRole.PROVIDER }
+      data: {
+        role: UserRole.PROVIDER,
+        sessionVersion: {
+          increment: 1
+        }
+      }
+    });
+
+    await tx.session.updateMany({
+      where: { userId: worker.userId, revoked: false },
+      data: { revoked: true }
     });
 
     assertProfileCompleteForReview(worker);

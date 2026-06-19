@@ -4,8 +4,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "../config/env.js";
 import { addressRouter } from "../modules/addresses/address.routes.js";
+import { authenticateEnvAdmin } from "../modules/admin-auth/admin-auth.middleware.js";
+import { adminAuthRouter } from "../modules/admin-auth/admin-auth.routes.js";
+import { adminManagementRouter } from "../modules/admin-management/admin-management.routes.js";
 import { adminRouter } from "../modules/admin/admin.routes.js";
 import { authRouter } from "../modules/auth/auth.routes.js";
+import { adminBannerRouter, contentBannerRouter } from "../modules/banners/banner.routes.js";
 import { chatRouter } from "../modules/chats/chat.routes.js";
 import { favoriteRouter } from "../modules/favorites/favorite.routes.js";
 import { healthRouter } from "../modules/health/health.routes.js";
@@ -56,13 +60,19 @@ const corsOptions: CorsOptions = {
 export function createApp() {
   const app = express();
 
+  app.set("trust proxy", env.TRUST_PROXY);
   app.use(cors(corsOptions));
   app.use(express.json({ limit: "1mb" }));
   app.use("/uploads", express.static(uploadDir));
 
   app.use("/health", healthRouter);
   app.use("/auth", authRouter);
+  app.use("/admin/auth", adminAuthRouter);
+  app.use("/admin", authenticateEnvAdmin);
+  app.use("/admin/admins", adminManagementRouter);
+  app.use("/admin/banners", adminBannerRouter);
   app.use("/admin", adminRouter);
+  app.use("/content", contentBannerRouter);
   app.use("/addresses", addressRouter);
   app.use("/favorites", favoriteRouter);
   app.use("/workers", workerRouter);

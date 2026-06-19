@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+import { isAdminRole } from "../permissions.js";
 
 export function requireRole(role: string): RequestHandler {
   return (request, _response, next) => {
@@ -9,6 +10,11 @@ export function requireRole(role: string): RequestHandler {
           code: "UNAUTHORIZED"
         })
       );
+      return;
+    }
+
+    if (role.toUpperCase() === "ADMIN" && isAdminRole(request.user.role)) {
+      next();
       return;
     }
 

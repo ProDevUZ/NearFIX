@@ -5,9 +5,10 @@ import { fetchAdminMe, loginAdmin } from "@/services/admin-auth";
 
 type AdminSession = {
   id: string;
-  phone: string;
+  username: string;
   name: string | null;
   role: string;
+  permissions: string[];
   token: string;
 };
 
@@ -16,7 +17,7 @@ type AdminSessionState = {
   isSessionReady: boolean;
   setSession: (session: AdminSession | null) => void;
   hydrateSession: () => Promise<void>;
-  loginWithPhone: (phone: string) => Promise<{ ok: boolean; message?: string }>;
+  login: (username: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   logout: () => void;
 };
 
@@ -33,7 +34,7 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
 
     try {
       const result = await fetchAdminMe(token);
-      if (result.user.role !== "admin") {
+      if (!["admin", "super_admin"].includes(result.user.role)) {
         window.localStorage.removeItem("nearfix-admin-token");
         set({ session: null, isSessionReady: true });
         return;
@@ -42,9 +43,10 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
       set({
         session: {
           id: result.user.id,
-          phone: result.user.phone,
+          username: result.user.username,
           name: result.user.name,
           role: result.user.role,
+          permissions: result.user.permissions || [],
           token
         },
         isSessionReady: true
@@ -54,10 +56,10 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
       set({ session: null, isSessionReady: true });
     }
   },
-  loginWithPhone: async (phone) => {
+  login: async (username, password) => {
     try {
-      const result = await loginAdmin(phone);
-      if (result.user.role !== "admin") {
+      const result = await loginAdmin(username, password);
+      if (!["admin", "super_admin"].includes(result.user.role)) {
         return { ok: false, message: "Admin role required" };
       }
 
@@ -65,9 +67,10 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
       set({
         session: {
           id: result.user.id,
-          phone: result.user.phone,
+          username: result.user.username,
           name: result.user.name,
           role: result.user.role,
+          permissions: result.user.permissions || [],
           token: result.token
         },
         isSessionReady: true

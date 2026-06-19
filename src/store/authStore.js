@@ -1,9 +1,21 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { loginWithPhoneApi, logoutApi, getCurrentUserApi, refreshAccessTokenApi, updateCurrentUserApi } from "../services/auth";
+import { verifyOtp as verifyOtpApi, logoutApi, getCurrentUserApi, refreshAccessTokenApi, updateCurrentUserApi } from "../services/auth";
 
 const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
+
+function toSession(apiResult, user = apiResult.user) {
+  return {
+    token: apiResult.accessToken || apiResult.token,
+    refreshToken: apiResult.refreshToken,
+    userId: user.id,
+    phone: user.phone,
+    name: user.name,
+    role: user.role,
+    sessionVersion: user.sessionVersion
+  };
+}
 
 export const useAuthStore = create(
   persist(
@@ -12,27 +24,26 @@ export const useAuthStore = create(
   invalidation: null,
   hasHydrated: false,
   setHasHydrated: (value) => set({ hasHydrated: value }),
-  loginWithPhone: async (phone, name, code) => {
-    const apiResult = await loginWithPhoneApi(phone || "+998", name, code);
+  verifyOtp: async (phone, code, name) => {
+    const apiResult = await verifyOtpApi(phone || "+998", code);
     if (!apiResult.ok) return apiResult;
 
-    const role = apiResult.user.role;
-    const sessionVersion = apiResult.user.sessionVersion;
+    let user = apiResult.user;
+    const accessToken = apiResult.accessToken || apiResult.token;
+
+    if (name && name !== user.name) {
+      const profileResult = await updateCurrentUserApi(accessToken, { name });
+      if (profileResult.ok) {
+        user = profileResult.user;
+      }
+    }
 
     set({
-      session: {
-        token: apiResult.token,
-        refreshToken: apiResult.refreshToken,
-        userId: apiResult.user.id,
-        phone: apiResult.user.phone,
-        name: apiResult.user.name,
-        role,
-        sessionVersion
-      },
+      session: toSession(apiResult, user),
       invalidation: null
     });
 
-    return { ok: true, role, source: "api" };
+    return { ok: true, role: user.role, source: "api" };
   },
   updateProfile: async (profile) => {
     const current = get().session;
@@ -87,26 +98,6 @@ export const useAuthStore = create(
       }
 
       return refreshResult;
-    }
-
-    if (current.phone) {
-      const loginResult = await loginWithPhoneApi(current.phone);
-      if (loginResult.ok) {
-        set({
-          session: {
-            ...current,
-            token: loginResult.token,
-            refreshToken: loginResult.refreshToken,
-            userId: loginResult.user.id,
-            phone: loginResult.user.phone,
-            name: loginResult.user.name,
-            role: loginResult.user.role,
-            sessionVersion: loginResult.user.sessionVersion
-          },
-          invalidation: null
-        });
-        return { ok: true, token: loginResult.token };
-      }
     }
 
     const result = await getCurrentUserApi(current.token);

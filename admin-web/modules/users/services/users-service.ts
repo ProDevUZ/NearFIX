@@ -3,7 +3,9 @@ import { users } from "@/services/mock-data";
 import type { AdminUser, City, UserRole } from "@/contracts/admin";
 
 function mapRole(role: string): UserRole {
-  return role.toLowerCase() === "provider" ? "provider" : "client";
+  const value = role.toLowerCase();
+  if (value === "provider" || value === "admin" || value === "super_admin") return value;
+  return "client";
 }
 
 export async function getUsers(): Promise<AdminUser[]> {

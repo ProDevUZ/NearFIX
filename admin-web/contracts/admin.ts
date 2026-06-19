@@ -9,7 +9,7 @@ export type OrderStatus =
 export type WorkerAvailability = "available" | "busy" | "offline";
 export type WorkerProfileStatus = "draft" | "approved" | "suspended";
 
-export type UserRole = "client" | "provider";
+export type UserRole = "client" | "provider" | "admin" | "super_admin";
 
 export type ReviewStatus = "published" | "hidden";
 
