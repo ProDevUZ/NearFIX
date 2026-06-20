@@ -14,8 +14,10 @@ export const errorHandler: ErrorRequestHandler = (error, request, response, _nex
 
   const status = typeof error?.status === "number" ? error.status : 500;
   if (status >= 400) {
-    console.error(
-      `[api-error] ${request.method} ${request.originalUrl} ${status} ${error?.code || "INTERNAL_ERROR"}: ${
+    const log = status >= 500 ? console.error : console.warn;
+    const level = status >= 500 ? "error" : "warning";
+    log(
+      `[api-${level}] ${request.method} ${request.originalUrl} ${status} ${error?.code || "INTERNAL_ERROR"}: ${
         error?.message || "Unexpected server error"
       }`
     );
