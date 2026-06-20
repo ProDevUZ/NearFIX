@@ -229,6 +229,7 @@ export async function updateAdminReport(
   const existing = await prisma.report.findUnique({ where: { id: reportId }, select: { id: true } });
   if (!existing) throw Object.assign(new Error("Report not found"), { status: 404, code: "REPORT_NOT_FOUND" });
 
+  const resolverUserId = adminId === "env-admin" ? null : adminId;
   const terminal =
     input.status === ReportStatus.RESOLVED ||
     input.status === ReportStatus.DISMISSED ||
@@ -238,7 +239,7 @@ export async function updateAdminReport(
     data: {
       status: input.status,
       adminNote: input.adminNote?.trim() || null,
-      resolvedByAdminId: terminal ? adminId : null,
+      resolvedByAdminId: terminal ? resolverUserId : null,
       resolvedAt: terminal ? new Date() : null
     }
   });

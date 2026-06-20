@@ -86,13 +86,14 @@ export async function updateAdminSupportTicket(
   const existing = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { id: true } });
   if (!existing) throw Object.assign(new Error("Support ticket not found"), { status: 404, code: "SUPPORT_TICKET_NOT_FOUND" });
 
+  const resolverUserId = adminId === "env-admin" ? null : adminId;
   const terminal = input.status === SupportTicketStatus.RESOLVED || input.status === SupportTicketStatus.CLOSED;
   return prisma.supportTicket.update({
     where: { id: ticketId },
     data: {
       status: input.status,
       adminNote: input.adminNote?.trim() || null,
-      resolvedByAdminId: terminal ? adminId : null,
+      resolvedByAdminId: terminal ? resolverUserId : null,
       resolvedAt: terminal ? new Date() : null
     }
   });

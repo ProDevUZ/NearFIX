@@ -140,6 +140,10 @@ async function main() {
       status: ReportStatus.ACTION_TAKEN,
       adminNote: "Smoke test complete"
     });
+    await updateAdminReport(userReport.id, "env-admin", {
+      status: ReportStatus.RESOLVED,
+      adminNote: "Env admin compatibility"
+    });
     const reports = await listAdminReports({ status: ReportStatus.PENDING });
     ensure(reports.length >= 4, "Admin report queue missing pending reports");
 
@@ -168,6 +172,10 @@ async function main() {
     await updateAdminSupportTicket(clientTicket.id, admin.id, {
       status: SupportTicketStatus.RESOLVED,
       adminNote: "Resolved by smoke test"
+    });
+    await updateAdminSupportTicket(clientTicket.id, "env-admin", {
+      status: SupportTicketStatus.CLOSED,
+      adminNote: "Env admin compatibility"
     });
 
     await setReviewVisibility(review.id, ReviewStatus.HIDDEN);
