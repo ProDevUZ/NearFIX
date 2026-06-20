@@ -13,6 +13,7 @@ import { adminBannerRouter, contentBannerRouter } from "../modules/banners/banne
 import { chatRouter } from "../modules/chats/chat.routes.js";
 import { favoriteRouter } from "../modules/favorites/favorite.routes.js";
 import { healthRouter } from "../modules/health/health.routes.js";
+import { legalRouter } from "../modules/legal/legal.routes.js";
 import { mediaRouter } from "../modules/media/media.routes.js";
 import { notificationRouter } from "../modules/notifications/notification.routes.js";
 import { orderRouter } from "../modules/orders/order.routes.js";
@@ -66,6 +67,7 @@ export function createApp() {
   app.use("/uploads", express.static(uploadDir));
 
   app.use("/health", healthRouter);
+  app.use("/legal", legalRouter);
   app.use("/auth", authRouter);
   app.use("/admin/auth", adminAuthRouter);
   app.use("/admin", authenticateEnvAdmin);

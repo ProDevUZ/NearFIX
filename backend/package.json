@@ -18,7 +18,8 @@
     "app-review:prepare": "tsx scripts/prepare-app-review-demo.ts",
     "db:clean-start": "tsx prisma/clean-start.ts",
     "check": "npm run prisma:validate && npm run build",
-    "test:otp-security": "tsx scripts/otp-security-tests.ts"
+    "test:otp-security": "tsx scripts/otp-security-tests.ts",
+    "test:legal-routes": "tsx scripts/legal-routes-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1071.0",
