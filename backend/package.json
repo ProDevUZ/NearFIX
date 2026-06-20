@@ -15,6 +15,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "app-review:prepare": "tsx scripts/prepare-app-review-demo.ts",
     "db:clean-start": "tsx prisma/clean-start.ts",
     "check": "npm run prisma:validate && npm run build",
     "test:otp-security": "tsx scripts/otp-security-tests.ts"

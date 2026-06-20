@@ -1,5 +1,6 @@
 import { Router, type Request } from "express";
 import multer from "multer";
+import { env } from "../../config/env.js";
 import { createR2ObjectKey, uploadObjectToR2 } from "../../storage/r2.storage.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requirePermission } from "../auth/middleware/permission.guard.js";
@@ -150,4 +151,12 @@ contentBannerRouter.get("/banners", async (request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+contentBannerRouter.get("/legal", (_request, response) => {
+  response.json({
+    ok: true,
+    privacyPolicyUrl: env.PRIVACY_POLICY_URL || null,
+    termsUrl: env.TERMS_URL || null
+  });
 });

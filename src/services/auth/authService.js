@@ -92,3 +92,18 @@ export async function logoutApi(token, pushToken) {
     return { ok: true };
   });
 }
+
+export async function deleteCurrentUserApi(token) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/me", {
+      method: "DELETE",
+      token
+    });
+
+    return {
+      ok: true,
+      deleted: payload.deleted,
+      deletedAt: payload.deletedAt
+    };
+  });
+}

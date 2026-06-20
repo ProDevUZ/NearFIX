@@ -6,6 +6,7 @@ import { PrimaryButton } from "../../components/ui/Button";
 import { requestOtp } from "../../services/auth";
 import { useAuthStore } from "../../store/authStore";
 import { colors, iconSizes, radius, shadow } from "../../theme";
+import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
 
 const OTP_ERROR_MESSAGES = {
   OTP_INVALID: "Tasdiqlash kodi noto'g'ri.",
@@ -64,8 +65,8 @@ export function LoginScreen() {
 
     if (otpRequested && cleanPhone === verifiedPhone && cleanName === verifiedName) {
       const code = otpCode.trim();
-      if (!/^\d{4}$/.test(code)) {
-        Alert.alert("OTP kod kerak", "SMS orqali kelgan 4 xonali kodni kiriting.");
+      if (!/^\d{4,12}$/.test(code)) {
+        Alert.alert("OTP kod kerak", "Tasdiqlash kodini to'liq kiriting.");
         return;
       }
 
@@ -188,7 +189,7 @@ export function LoginScreen() {
               <Text style={styles.inputLabel}>OTP kod</Text>
               <TextInput
                 keyboardType="number-pad"
-                maxLength={4}
+                maxLength={12}
                 placeholder="SMS kodi"
                 placeholderTextColor={colors.subtle}
                 style={styles.input}
@@ -214,7 +215,17 @@ export function LoginScreen() {
           onPress={handleContinue}
         />
         <Text style={styles.demoHint}>Rol backend/admin tomonidan sessiyaga bog'lanadi.</Text>
-        <Text style={styles.terms}>Davom etish orqali foydalanish shartlariga rozilik bildirasiz.</Text>
+        <View style={styles.legalConsent}>
+          <Text style={styles.terms}>Davom etish orqali </Text>
+          <Pressable onPress={openTerms}>
+            <Text style={styles.legalLink}>Foydalanish shartlari</Text>
+          </Pressable>
+          <Text style={styles.terms}> va </Text>
+          <Pressable onPress={openPrivacyPolicy}>
+            <Text style={styles.legalLink}>Maxfiylik siyosati</Text>
+          </Pressable>
+          <Text style={styles.terms}>ga rozilik bildirasiz.</Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -337,10 +348,22 @@ const styles = StyleSheet.create({
     color: colors.subtle
   },
   terms: {
-    textAlign: "center",
     color: colors.subtle,
     fontSize: 12,
     lineHeight: 18
+  },
+  legalConsent: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  legalLink: {
+    color: colors.primary,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
+    textDecorationLine: "underline"
   },
   demoHint: {
     color: colors.primary,

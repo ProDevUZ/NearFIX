@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { verifyOtp as verifyOtpApi, logoutApi, getCurrentUserApi, refreshAccessTokenApi, updateCurrentUserApi } from "../services/auth";
+import {
+  deleteCurrentUserApi,
+  verifyOtp as verifyOtpApi,
+  logoutApi,
+  getCurrentUserApi,
+  refreshAccessTokenApi,
+  updateCurrentUserApi
+} from "../services/auth";
 
 const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
 
@@ -139,6 +146,21 @@ export const useAuthStore = create(
     set({
       session: null
     });
+  },
+  deleteAccount: async () => {
+    const current = get().session;
+    if (!current?.token) return { ok: false, message: "No API session token" };
+
+    const result = await deleteCurrentUserApi(current.token);
+    if (!result.ok) return result;
+
+    await AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+    set({
+      session: null,
+      invalidation: null
+    });
+
+    return result;
   },
   invalidateSessionForRoleChange: (nextRole) => {
     const current = get().session;

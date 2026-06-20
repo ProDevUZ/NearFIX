@@ -55,6 +55,23 @@ export const useClientStore = create((set, get) => ({
   catalogFilters: DEFAULT_CATALOG_FILTERS,
   selectedWorkerId: null,
   orderDraft: initialOrderDraft,
+  clearUserData: () =>
+    set({
+      user: initialUser,
+      workers: [],
+      orders: [],
+      activeOrder: null,
+      chatMessages: [],
+      savedAddresses: [],
+      favoriteWorkerIds: [],
+      selectedWorkerId: null,
+      orderDraft: initialOrderDraft,
+      addressStatus: {
+        loading: false,
+        saving: false,
+        error: null
+      }
+    }),
   setSelectedCity: (cityId) => set({ selectedCityId: cityId }),
   syncCatalogFromApi: async (profession) => {
     const { selectedCityId } = get();

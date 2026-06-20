@@ -8,6 +8,7 @@ import {
 } from "./auth.contracts.js";
 import { authenticate } from "./middleware/auth.middleware.js";
 import { otpRequestIpRateLimit } from "./middleware/otp-ip-rate-limit.js";
+import { deleteCurrentUserAccount } from "./account-deletion.service.js";
 import {
   loginOrRegisterWithPhone,
   refreshAccessToken,
@@ -89,6 +90,20 @@ authRouter.patch("/me", authenticate, async (request, response, next) => {
     response.json({
       ok: true,
       user
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.delete("/me", authenticate, async (request, response, next) => {
+  try {
+    const result = await deleteCurrentUserAccount(request.user!.id);
+
+    response.json({
+      ok: true,
+      deleted: true,
+      deletedAt: result.deletedAt
     });
   } catch (error) {
     next(error);

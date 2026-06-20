@@ -12,7 +12,7 @@ export const otpRequestSchema = z.object({
 
 export const otpVerifySchema = z.object({
   phone: z.string().min(7).max(32),
-  code: z.string().regex(/^\d{4}$/)
+  code: z.string().regex(/^\d{4,12}$/)
 });
 
 export const updateCurrentUserSchema = z.object({

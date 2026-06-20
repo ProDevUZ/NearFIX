@@ -80,6 +80,30 @@ export const useWorkerStore = create((set, get) => ({
     source: "idle",
     lastError: null
   },
+  clearUserData: () =>
+    set({
+      workerProfile: null,
+      incomingRequests: [],
+      activeJob: null,
+      operationalStatus: WORKER_STATUS.OFFLINE,
+      earnings: {
+        todayEarnings: 0,
+        weekEarnings: 0,
+        monthEarnings: 0,
+        completedJobs: 0,
+        activeHours: 0,
+        averagePerDay: 0,
+        growthPercentage: 0,
+        platformFees: 0,
+        revenueTrend: []
+      },
+      transactions: [],
+      completedOrders: [],
+      apiStatus: {
+        source: "idle",
+        lastError: null
+      }
+    }),
   syncWorkerFromApi: async () => {
     const token = useAuthStore.getState().session?.token;
     if (!token) return { ok: false, message: "API sessiya tokeni topilmadi." };

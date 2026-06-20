@@ -7,6 +7,7 @@ import {
   Check,
   CircleHelp,
   Edit3,
+  FileText,
   Globe2,
   LogOut,
   MapPin,
@@ -23,6 +24,7 @@ import { fetchUnreadNotificationCountApi } from "../../services/notifications/no
 import { useAuthStore } from "../../store/authStore";
 import { useClientStore } from "../../store/clientStore";
 import { useUiStore } from "../../store/uiStore";
+import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
 
 const font = {
   medium: "Inter_500Medium",
@@ -36,6 +38,7 @@ const addressNameSuggestions = ["Uy", "Ofis", "Ish", "Ota-ona uyi"];
 export function ClientProfileScreen({ navigation, route }) {
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const updateProfile = useAuthStore((state) => state.updateProfile);
   const user = useClientStore((state) => state.user);
   const savedAddresses = useClientStore((state) => state.savedAddresses);
@@ -45,6 +48,7 @@ export function ClientProfileScreen({ navigation, route }) {
   const updateAddress = useClientStore((state) => state.updateAddress);
   const removeAddress = useClientStore((state) => state.removeAddress);
   const syncClientProfileFromApi = useClientStore((state) => state.syncClientProfileFromApi);
+  const clearUserData = useClientStore((state) => state.clearUserData);
   const locale = useUiStore((state) => state.locale);
   const setLocale = useUiStore((state) => state.setLocale);
   const [nameDraft, setNameDraft] = useState(session?.name || user.name || "");
@@ -56,6 +60,7 @@ export function ClientProfileScreen({ navigation, route }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [addressFormMode, setAddressFormMode] = useState("create");
   const [editingAddressId, setEditingAddressId] = useState(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [addressDraft, setAddressDraft] = useState({
     title: "",
     address: "",
@@ -124,6 +129,50 @@ export function ClientProfileScreen({ navigation, route }) {
 
   function showComingSoon() {
     Alert.alert("NearFIX", translate(locale, "paymentComingSoon"));
+  }
+
+  function confirmDeleteAccount() {
+    if (deletingAccount) return;
+
+    Alert.alert(
+      "Hisobni o'chirish",
+      "Profil ma'lumotlari anonimlashtiriladi. Saqlangan manzillar, sevimlilar va faol sessiyalar o'chiriladi. Buyurtma va chat tarixi qonuniy yoki operatsion zarurat uchun anonim ko'rinishda saqlanishi mumkin.",
+      [
+        { text: "Bekor qilish", style: "cancel" },
+        {
+          text: "Davom etish",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Qayta tiklab bo'lmaydi",
+              "Hisobni o'chirishni aniq tasdiqlaysizmi?",
+              [
+                { text: "Yo'q", style: "cancel" },
+                {
+                  text: "Hisobni o'chirish",
+                  style: "destructive",
+                  onPress: handleDeleteAccount
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    const result = await deleteAccount();
+
+    if (!result.ok) {
+      setDeletingAccount(false);
+      Alert.alert("Hisob o'chirilmadi", result.message || "Qayta urinib ko'ring.");
+      return;
+    }
+
+    clearUserData();
+    Alert.alert("Hisob o'chirildi", "Shaxsiy ma'lumotlaringiz anonimlashtirildi.");
   }
 
   async function handleSaveProfile() {
@@ -365,6 +414,27 @@ export function ClientProfileScreen({ navigation, route }) {
             }
           />
           <SettingRow icon={CircleHelp} iconColor="#6B7280" iconBg="#F1F5F9" title={translate(locale, "help")} />
+          <SettingRow
+            icon={Shield}
+            iconColor="#0F80B7"
+            iconBg="#EAF8FC"
+            title="Maxfiylik siyosati"
+            onPress={openPrivacyPolicy}
+          />
+          <SettingRow
+            icon={FileText}
+            iconColor="#6D5BD0"
+            iconBg="#F3F0FF"
+            title="Foydalanish shartlari"
+            onPress={openTerms}
+          />
+          <SettingRow
+            icon={Trash2}
+            iconColor="#EF4444"
+            iconBg="#FEECEC"
+            title={deletingAccount ? "Hisob o'chirilmoqda..." : "Hisobni o'chirish"}
+            onPress={confirmDeleteAccount}
+          />
           <Pressable onPress={handleLogout} style={styles.logoutRow}>
             <View style={styles.logoutIcon}>
               <LogOut size={22} color="#EF4444" strokeWidth={2.6} />

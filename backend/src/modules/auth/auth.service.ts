@@ -26,6 +26,22 @@ function isTestOtpAllowed() {
   return env.NODE_ENV !== "production";
 }
 
+function appReviewPhoneNumbers() {
+  return new Set(
+    env.APP_REVIEW_PHONE_NUMBERS.split(",")
+      .map((phone) => phone.trim())
+      .filter(Boolean)
+  );
+}
+
+function isAppReviewPhone(phone: string) {
+  return env.APP_REVIEW_OTP_ENABLED && appReviewPhoneNumbers().has(phone);
+}
+
+function maskPhone(phone: string) {
+  return `${phone.slice(0, 4)}***${phone.slice(-3)}`;
+}
+
 type UserWithPermissions = {
   id: string;
   phone: string;
@@ -131,7 +147,22 @@ export async function loginOrRegisterWithPhone(input: LoginInput, authProvider: 
 
 export async function requestOtp(input: { phone: string }, authProvider: AuthProvider = defaultAuthProvider, service: OtpService = otpService) {
   const phone = normalizePhone(input.phone);
-  const { challenge, code } = await service.createChallenge(phone);
+  const reviewRequest = isAppReviewPhone(phone);
+  const { challenge, code } = await service.createChallenge(
+    phone,
+    reviewRequest ? env.APP_REVIEW_OTP_CODE : undefined
+  );
+
+  if (reviewRequest) {
+    await service.setProviderMessageId(challenge.id, "app-review");
+    console.info(`[app-review-otp] challenge created for ${maskPhone(phone)}`);
+    return {
+      success: true,
+      expiresIn: service.ttlSeconds,
+      resendIn: service.resendCooldownSeconds
+    };
+  }
+
   const deliveryResult = await authProvider.sendOtp(phone, code);
 
   await service.setProviderMessageId(challenge.id, deliveryResult?.providerMessageId);
@@ -146,6 +177,10 @@ export async function requestOtp(input: { phone: string }, authProvider: AuthPro
 export async function verifyOtpAndCreateSession(input: { phone: string; code: string }, service: OtpService = otpService) {
   const phone = normalizePhone(input.phone);
   await service.verifyChallenge(phone, input.code);
+
+  if (isAppReviewPhone(phone)) {
+    console.info(`[app-review-otp] challenge verified for ${maskPhone(phone)}`);
+  }
 
   return createSessionForPhone({ phone });
 }

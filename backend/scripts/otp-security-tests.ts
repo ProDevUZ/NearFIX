@@ -117,6 +117,8 @@ function testProductionFakeProviderBlock() {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://nearfix:nearfix@localhost:5432/nearfix?schema=public",
         ACCESS_TOKEN_SECRET: "test-secret",
+        ADMIN_USERNAME: "test-admin",
+        ADMIN_PASSWORD: "test-admin-password",
         SESSION_SECRET: "test-secret",
         CORS_ORIGINS: "https://nearfix.uz",
         OTP_PROVIDER: "fake"

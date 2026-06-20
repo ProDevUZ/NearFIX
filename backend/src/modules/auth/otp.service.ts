@@ -52,7 +52,7 @@ export class OtpService {
   readonly phoneRateLimit = OTP_PHONE_RATE_LIMIT;
   readonly phoneRateWindowMinutes = OTP_PHONE_RATE_WINDOW_MINUTES;
 
-  async createChallenge(phone: string) {
+  async createChallenge(phone: string, codeOverride?: string) {
     const normalizedPhone = normalizePhone(phone);
 
     return prisma.$transaction(async (tx) => {
@@ -101,7 +101,7 @@ export class OtpService {
         }
       });
 
-      const code = generateOtpCode();
+      const code = codeOverride || generateOtpCode();
       const codeHash = hashOtpCode(normalizedPhone, code);
       const challenge = await tx.otpChallenge.create({
         data: {

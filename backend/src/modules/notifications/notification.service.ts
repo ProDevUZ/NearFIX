@@ -1,4 +1,4 @@
-import { NotificationStatus, type Prisma } from "@prisma/client";
+import { NotificationStatus, UserStatus, type Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 
 type NotificationInput = {
@@ -37,6 +37,16 @@ async function sendExpoPush(tokens: string[], title: string, body: string, data?
 }
 
 export async function createNotification(input: NotificationInput) {
+  const activeUser = await prisma.user.findFirst({
+    where: {
+      id: input.userId,
+      status: UserStatus.ACTIVE
+    },
+    select: { id: true }
+  });
+
+  if (!activeUser) return null;
+
   const payload = {
     ...(typeof input.payload === "object" && input.payload ? input.payload : {}),
     title: input.title,

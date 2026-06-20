@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Bell, Camera, CheckCircle2, Clock3, LogOut, ShieldCheck, UserRound } from "lucide-react-native";
+import { Bell, Camera, CheckCircle2, Clock3, FileText, LogOut, Shield, ShieldCheck, Trash2, UserRound } from "lucide-react-native";
 import { CITIES } from "../../constants/catalog";
 import { ROUTES } from "../../constants/routes";
 import { uploadMediaApi } from "../../services/media/mediaService";
@@ -10,15 +10,18 @@ import { fetchUnreadNotificationCountApi } from "../../services/notifications/no
 import { useAuthStore } from "../../store/authStore";
 import { useWorkerStore } from "../../store/workerStore";
 import { colors, radius, shadow } from "../../theme";
+import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
 
 const serviceOptions = ["Santexnik", "Elektrik", "Payvandchi", "Usta", "Konditsioner", "Ta'mirlash", "Tozalash"];
 
 export function WorkerProfileManageScreen({ navigation }) {
   const token = useAuthStore((state) => state.session?.token);
   const logout = useAuthStore((state) => state.logout);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const worker = useWorkerStore((state) => state.workerProfile);
   const syncWorkerFromApi = useWorkerStore((state) => state.syncWorkerFromApi);
   const submitWorkerProfile = useWorkerStore((state) => state.submitWorkerProfile);
+  const clearUserData = useWorkerStore((state) => state.clearUserData);
   const [name, setName] = useState(worker?.name || "");
   const [experienceYears, setExperienceYears] = useState(String(worker?.experienceYears || ""));
   const [basePrice, setBasePrice] = useState(worker?.basePriceValue ? String(worker.basePriceValue) : "");
@@ -30,6 +33,7 @@ export function WorkerProfileManageScreen({ navigation }) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const isApproved = worker?.status === "approved";
 
   useEffect(() => {
@@ -201,6 +205,46 @@ export function WorkerProfileManageScreen({ navigation }) {
     ]);
   }
 
+  function confirmDeleteAccount() {
+    if (deletingAccount) return;
+
+    Alert.alert(
+      "Hisobni o'chirish",
+      "Usta profilingiz katalogdan olib tashlanadi, shaxsiy ma'lumotlar anonimlashtiriladi va barcha sessiyalar yopiladi. Buyurtma va chat tarixi anonim ko'rinishda saqlanishi mumkin.",
+      [
+        { text: "Bekor qilish", style: "cancel" },
+        {
+          text: "Davom etish",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert("Qayta tiklab bo'lmaydi", "Hisobni o'chirishni aniq tasdiqlaysizmi?", [
+              { text: "Yo'q", style: "cancel" },
+              {
+                text: "Hisobni o'chirish",
+                style: "destructive",
+                onPress: handleDeleteAccount
+              }
+            ]);
+          }
+        }
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setDeletingAccount(true);
+    const result = await deleteAccount();
+
+    if (!result.ok) {
+      setDeletingAccount(false);
+      Alert.alert("Hisob o'chirilmadi", result.message || "Qayta urinib ko'ring.");
+      return;
+    }
+
+    clearUserData();
+    Alert.alert("Hisob o'chirildi", "Shaxsiy ma'lumotlaringiz anonimlashtirildi.");
+  }
+
   async function handleRefresh() {
     setRefreshing(true);
     await syncWorkerFromApi();
@@ -324,6 +368,18 @@ export function WorkerProfileManageScreen({ navigation }) {
         </Text>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Huquqiy ma'lumotlar va hisob</Text>
+        <ProfileAction icon={Shield} label="Maxfiylik siyosati" onPress={openPrivacyPolicy} />
+        <ProfileAction icon={FileText} label="Foydalanish shartlari" onPress={openTerms} />
+        <ProfileAction
+          danger
+          icon={Trash2}
+          label={deletingAccount ? "Hisob o'chirilmoqda..." : "Hisobni o'chirish"}
+          onPress={confirmDeleteAccount}
+        />
+      </View>
+
       {isApproved ? null : (
         <Pressable onPress={handleSubmit} disabled={saving} style={[styles.submitButton, saving && styles.submitButtonMuted]}>
           <CheckCircle2 size={21} color={colors.white} strokeWidth={2.6} />
@@ -340,6 +396,15 @@ function Field({ label, ...props }) {
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput placeholderTextColor={colors.subtle} style={styles.input} {...props} />
     </View>
+  );
+}
+
+function ProfileAction({ icon: Icon, label, onPress, danger = false }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.profileAction, pressed && styles.profileActionPressed]}>
+      <Icon size={20} color={danger ? colors.danger : colors.primary} strokeWidth={2.5} />
+      <Text style={[styles.profileActionText, danger && styles.profileActionDanger]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -612,6 +677,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     fontFamily: "Inter_700Bold"
+  },
+  profileAction: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  profileActionPressed: {
+    opacity: 0.75
+  },
+  profileActionText: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: "Inter_700Bold"
+  },
+  profileActionDanger: {
+    color: colors.danger
   },
   submitButton: {
     minHeight: 56,
