@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Camera, MessageCircle, Phone, ShieldCheck, Video } from "lucide-react-native";
+import { Camera, Flag, LifeBuoy, MessageCircle, Phone, ShieldCheck, Video } from "lucide-react-native";
 import { CountdownCard } from "./CountdownCard";
 import { OrderTimeline } from "./OrderTimeline";
 import { StatusBadge } from "./StatusBadge";
@@ -32,7 +32,7 @@ function WorkerSummary({ worker, onChat }) {
   );
 }
 
-export function ActiveOrderCard({ order, worker, onChat, onCancel }) {
+export function ActiveOrderCard({ order, worker, onChat, onCancel, onReport, onSupport }) {
   if (!order) return null;
 
   const copy = trackingStatusCopy[order.statusKey] || trackingStatusCopy[TRACKING_STATUSES.REQUEST_SENT];
@@ -76,6 +76,17 @@ export function ActiveOrderCard({ order, worker, onChat, onCancel }) {
           <Text style={styles.uploadText}>Video</Text>
         </View>
         <Text style={styles.chatNote}>Chat faqat buyurtma tafsilotlari uchun.</Text>
+      </View>
+
+      <View style={styles.safetyActions}>
+        <Pressable onPress={onSupport} style={styles.supportButton}>
+          <LifeBuoy size={17} color={colors.primary} />
+          <Text style={styles.supportText}>Yordam</Text>
+        </Pressable>
+        <Pressable onPress={onReport} style={styles.reportButton}>
+          <Flag size={17} color={colors.danger} />
+          <Text style={styles.reportText}>Muammo haqida xabar berish</Text>
+        </Pressable>
       </View>
 
       {!cancelled && onCancel ? (
@@ -227,6 +238,44 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     fontWeight: "700"
+  },
+  safetyActions: {
+    flexDirection: "row",
+    gap: 8
+  },
+  supportButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#CFE8F0",
+    backgroundColor: "#F2FBFE",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  supportText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  reportButton: {
+    flex: 1.4,
+    minHeight: 42,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  reportText: {
+    color: colors.danger,
+    fontSize: 11,
+    fontWeight: "900"
   },
   cancelButton: {
     minHeight: 44,

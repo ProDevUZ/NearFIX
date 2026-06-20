@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import {
   ArrowLeft,
   BadgeCheck,
   CalendarCheck,
+  Ban,
   ClipboardList,
+  Flag,
   Heart,
   Home,
   MapPin,
@@ -22,6 +24,10 @@ import { useAuthStore } from "../../store/authStore";
 import { useClientStore } from "../../store/clientStore";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { WorkerAvatar } from "../../components/ui/WorkerAvatar";
+import { ReportModal } from "../../components/moderation/ReportModal";
+import { ReviewCard } from "../../components/profile/ReviewCard";
+import { blockUserApi } from "../../services/moderation/moderationService";
+import { fetchWorkerReviewsApi } from "../../services/workers/workerService";
 
 const font = {
   medium: "Inter_500Medium",
@@ -37,6 +43,20 @@ export function WorkerProfileScreen({ navigation }) {
   const toggleFavoriteWorker = useClientStore((state) => state.toggleFavoriteWorker);
   const [openingChat, setOpeningChat] = useState(false);
   const [savingFavorite, setSavingFavorite] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [blocking, setBlocking] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!worker?.id) return undefined;
+    fetchWorkerReviewsApi(worker.id).then((result) => {
+      if (mounted && result.ok) setReviews(result.reviews);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [worker?.id]);
   if (!worker) {
     return (
       <View style={styles.screen}>
@@ -100,6 +120,27 @@ export function WorkerProfileScreen({ navigation }) {
       url: workerUrl,
       message: `${title}\nNearFIX orqali ko'rish: ${workerUrl}`
     });
+  }
+
+  function confirmBlockWorker() {
+    if (!worker.userId || blocking) return;
+    Alert.alert(
+      "Ustani bloklash",
+      "Yangi chat ochish cheklanadi. Faol buyurtma bo‘lsa, avval yordam orqali hal qilish kerak.",
+      [
+        { text: "Bekor qilish", style: "cancel" },
+        {
+          text: "Bloklash",
+          style: "destructive",
+          onPress: async () => {
+            setBlocking(true);
+            const result = await blockUserApi(session?.token, worker.userId);
+            setBlocking(false);
+            Alert.alert(result.ok ? "Usta bloklandi" : "Bloklab bo‘lmadi", result.ok ? "Bloklangan foydalanuvchilar ro‘yxatidan qayta ochishingiz mumkin." : result.message || "Qayta urinib ko‘ring.");
+          }
+        }
+      ]
+    );
   }
 
   return (
@@ -178,6 +219,33 @@ export function WorkerProfileScreen({ navigation }) {
             {worker.about || "Usta hali o'zi haqida ma'lumot kiritmagan."}
           </Text>
         </View>
+
+        <View style={styles.safetySection}>
+          <Text style={styles.aboutTitle}>Xavfsizlik</Text>
+          <View style={styles.safetyActions}>
+            <Pressable onPress={() => setReportTarget({ targetType: "WORKER", targetId: worker.id, title: "Usta haqida shikoyat" })} style={styles.safetyButton}>
+              <Flag size={18} color="#EF4444" />
+              <Text style={styles.reportText}>Usta haqida shikoyat</Text>
+            </Pressable>
+            <Pressable onPress={confirmBlockWorker} disabled={!worker.userId || blocking} style={styles.safetyButton}>
+              <Ban size={18} color="#EF4444" />
+              <Text style={styles.reportText}>{blocking ? "Bloklanmoqda..." : "Ustani bloklash"}</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {reviews.length ? (
+          <View style={styles.reviewsSection}>
+            <Text style={styles.aboutTitle}>Sharhlar</Text>
+            {reviews.map((review) => (
+              <ReviewCard
+                key={review.id}
+                review={review}
+                onReport={() => setReportTarget({ targetType: "REVIEW", targetId: review.id, title: "Sharh haqida shikoyat" })}
+              />
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={styles.ctaBar}>
@@ -189,6 +257,14 @@ export function WorkerProfileScreen({ navigation }) {
         </Pressable>
       </View>
       <ScreenBottomNav navigation={navigation} />
+      <ReportModal
+        visible={Boolean(reportTarget)}
+        targetType={reportTarget?.targetType}
+        targetId={reportTarget?.targetId}
+        title={reportTarget?.title}
+        onClose={() => setReportTarget(null)}
+        onSuccess={() => Alert.alert("Shikoyat yuborildi", "Moderatorlar murojaatingizni ko‘rib chiqadi.")}
+      />
     </View>
   );
 }
@@ -425,6 +501,34 @@ const styles = StyleSheet.create({
   aboutSection: {
     paddingHorizontal: 24,
     paddingTop: 32
+  },
+  safetySection: {
+    paddingHorizontal: 24,
+    paddingTop: 26
+  },
+  safetyActions: {
+    marginTop: 14,
+    gap: 10
+  },
+  safetyButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FFF7F7",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9
+  },
+  reportText: {
+    color: "#DC2626",
+    fontFamily: font.bold
+  },
+  reviewsSection: {
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    gap: 10
   },
   aboutTitle: {
     color: "#273248",

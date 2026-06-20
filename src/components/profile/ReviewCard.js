@@ -1,9 +1,9 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Star } from "lucide-react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Flag, Star } from "lucide-react-native";
 import { colors, iconSizes, radius } from "../../theme";
 
-export function ReviewCard({ review }) {
+export function ReviewCard({ review, onReport }) {
   return (
     <View style={styles.card}>
       <View style={styles.top}>
@@ -17,6 +17,12 @@ export function ReviewCard({ review }) {
         </View>
       </View>
       <Text style={styles.text}>{review.text}</Text>
+      {onReport ? (
+        <Pressable onPress={onReport} style={styles.reportButton}>
+          <Flag size={14} color={colors.danger} />
+          <Text style={styles.reportText}>Sharh haqida shikoyat</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -58,5 +64,20 @@ const styles = StyleSheet.create({
     color: colors.muted,
     lineHeight: 20,
     fontWeight: "600"
+  },
+  reportButton: {
+    alignSelf: "flex-start",
+    minHeight: 32,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(239,68,68,0.08)",
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  reportText: {
+    color: colors.danger,
+    fontSize: 11,
+    fontWeight: "900"
   }
 });

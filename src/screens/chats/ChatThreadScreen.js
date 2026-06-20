@@ -34,6 +34,8 @@ import { ROUTES } from "../../constants/routes";
 import { fetchChatMessagesApi, markChatRoomReadApi, sendChatMessageApi } from "../../services/chats/chatService";
 import { uploadMediaApi } from "../../services/media/mediaService";
 import { useAuthStore } from "../../store/authStore";
+import { ReportModal } from "../../components/moderation/ReportModal";
+import { blockUserApi } from "../../services/moderation/moderationService";
 
 const font = {
   medium: "Inter_500Medium",
@@ -116,8 +118,10 @@ export function ChatThreadScreen({ navigation, route }) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputHeight, setInputHeight] = useState(MIN_MESSAGE_INPUT_HEIGHT);
   const [inputTextWidth, setInputTextWidth] = useState(220);
+  const [reportTarget, setReportTarget] = useState(null);
 
   const currentUserId = session?.userId;
+  const counterpartUserId = room.participants?.find((participant) => participant.userId !== currentUserId)?.userId;
 
   useEffect(() => {
     let mounted = true;
@@ -374,6 +378,25 @@ export function ChatThreadScreen({ navigation, route }) {
     }
   }
 
+  function openChatSafetyActions() {
+    if (!counterpartUserId) return;
+    Alert.alert("Chat xavfsizligi", "Kerakli amalni tanlang.", [
+      { text: "Bekor qilish", style: "cancel" },
+      {
+        text: "Foydalanuvchi haqida shikoyat",
+        onPress: () => setReportTarget({ targetType: "USER", targetId: counterpartUserId, title: "Foydalanuvchi haqida shikoyat" })
+      },
+      {
+        text: "Foydalanuvchini bloklash",
+        style: "destructive",
+        onPress: async () => {
+          const result = await blockUserApi(session?.token, counterpartUserId);
+          Alert.alert(result.ok ? "Foydalanuvchi bloklandi" : "Bloklab bo‘lmadi", result.ok ? "Yangi chat ochish cheklanadi." : result.message || "Qayta urinib ko‘ring.");
+        }
+      }
+    ]);
+  }
+
   const keyboardBottomInset = Platform.OS === "ios" && keyboardVisible ? keyboardHeight : 0;
 
   return (
@@ -391,7 +414,7 @@ export function ChatThreadScreen({ navigation, route }) {
           </Text>
           <Text style={styles.subtitle}>Buyurtma chati</Text>
         </View>
-        <Pressable style={styles.infoButton}>
+        <Pressable style={styles.infoButton} onPress={openChatSafetyActions}>
           <Info size={18} color="#FFFFFF" strokeWidth={3} />
         </Pressable>
       </View>
@@ -410,7 +433,11 @@ export function ChatThreadScreen({ navigation, route }) {
             item.direction === "out" ? (
               <OutgoingMessage message={item} onOpenImage={setSelectedImage} />
             ) : (
-              <IncomingMessage message={item} onOpenImage={setSelectedImage} />
+              <IncomingMessage
+                message={item}
+                onOpenImage={setSelectedImage}
+                onReport={() => setReportTarget({ targetType: "MESSAGE", targetId: item.id, title: "Xabar haqida shikoyat" })}
+              />
             )
           }
           ListHeaderComponent={
@@ -471,15 +498,23 @@ export function ChatThreadScreen({ navigation, route }) {
       />
 
       <ImageViewer image={selectedImage} onClose={() => setSelectedImage(null)} />
+      <ReportModal
+        visible={Boolean(reportTarget)}
+        targetType={reportTarget?.targetType}
+        targetId={reportTarget?.targetId}
+        title={reportTarget?.title}
+        onClose={() => setReportTarget(null)}
+        onSuccess={() => Alert.alert("Shikoyat yuborildi", "Moderatorlar murojaatingizni ko‘rib chiqadi.")}
+      />
 
       {keyboardVisible ? null : <ScreenBottomNav navigation={navigation} role={session?.role} />}
     </View>
   );
 }
 
-function IncomingMessage({ message, onOpenImage }) {
+function IncomingMessage({ message, onOpenImage, onReport }) {
   return (
-    <View style={styles.incomingRow}>
+    <Pressable style={styles.incomingRow} onLongPress={onReport} delayLongPress={450}>
       <View style={styles.avatar}>
         <UserRound size={16} color="#0F80B7" strokeWidth={2.4} />
       </View>
@@ -493,7 +528,7 @@ function IncomingMessage({ message, onOpenImage }) {
           {message.type === "image" ? <ImageMessage message={message} onOpenImage={onOpenImage} /> : null}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

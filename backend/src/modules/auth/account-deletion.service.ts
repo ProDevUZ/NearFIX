@@ -44,7 +44,12 @@ export async function deleteCurrentUserAccount(userId: string) {
       tx.address.deleteMany({ where: { userId } }),
       tx.favorite.deleteMany({ where: { clientId: userId } }),
       tx.notification.deleteMany({ where: { userId } }),
-      tx.otpChallenge.deleteMany({ where: { phone: user.phone } })
+      tx.otpChallenge.deleteMany({ where: { phone: user.phone } }),
+      tx.userBlock.deleteMany({
+        where: {
+          OR: [{ blockerId: userId }, { blockedUserId: userId }]
+        }
+      })
     ]);
 
     if (user.workerProfile) {

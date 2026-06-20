@@ -19,7 +19,8 @@
     "db:clean-start": "tsx prisma/clean-start.ts",
     "check": "npm run prisma:validate && npm run build",
     "test:otp-security": "tsx scripts/otp-security-tests.ts",
-    "test:legal-routes": "tsx scripts/legal-routes-test.ts"
+    "test:legal-routes": "tsx scripts/legal-routes-test.ts",
+    "test:sprint-b": "tsx scripts/sprint-b-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1071.0",

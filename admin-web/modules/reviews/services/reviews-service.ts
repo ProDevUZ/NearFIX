@@ -1,5 +1,4 @@
 import { apiClient, getAdminToken } from "@/services/api-client";
-import { reviews } from "@/services/mock-data";
 import type { AdminReview, ReviewStatus } from "@/contracts/admin";
 
 function mapStatus(status: string): ReviewStatus {
@@ -8,7 +7,7 @@ function mapStatus(status: string): ReviewStatus {
 
 export async function getReviews(): Promise<AdminReview[]> {
   const token = getAdminToken();
-  if (!token) return reviews;
+  if (!token) throw new Error("Admin authentication required");
 
   const payload = await apiClient<{ ok: boolean; reviews: any[] }>("/admin/reviews", { token });
   return payload.reviews.map((review) => ({
@@ -20,4 +19,14 @@ export async function getReviews(): Promise<AdminReview[]> {
     date: new Date(review.createdAt).toLocaleDateString("uz-UZ"),
     status: mapStatus(String(review.status || "published"))
   }));
+}
+
+export async function setReviewModerationStatus(reviewId: string, status: ReviewStatus) {
+  const token = getAdminToken();
+  if (!token) throw new Error("Admin authentication required");
+  const action = status === "hidden" ? "hide" : "restore";
+  await apiClient(`/admin/reviews/${reviewId}/${action}`, {
+    method: "PATCH",
+    token
+  });
 }

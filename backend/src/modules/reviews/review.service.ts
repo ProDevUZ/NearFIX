@@ -39,6 +39,24 @@ async function refreshWorkerRating(tx: Prisma.TransactionClient, workerId: strin
   return ratingAvg;
 }
 
+export async function setReviewVisibility(reviewId: string, status: ReviewStatus) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.review.findUnique({ where: { id: reviewId }, select: { id: true } });
+    if (!existing) throw Object.assign(new Error("Review not found"), { status: 404, code: "REVIEW_NOT_FOUND" });
+
+    const review = await tx.review.update({
+      where: { id: reviewId },
+      data: { status },
+      include: {
+        client: true,
+        worker: { include: { user: true } }
+      }
+    });
+    await refreshWorkerRating(tx, review.workerId);
+    return review;
+  });
+}
+
 export async function createOrderReview(user: AuthUser, orderId: string, input: CreateReviewInput) {
   if (user.role !== UserRole.CLIENT.toLowerCase()) {
     throw Object.assign(new Error("Only clients can create reviews"), {

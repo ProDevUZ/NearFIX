@@ -59,6 +59,22 @@ export async function fetchWorkerMeApi(token) {
   });
 }
 
+export async function fetchWorkerReviewsApi(workerId) {
+  return apiRequest(async () => {
+    const payload = await httpAuthRequest(`/workers/${workerId}/reviews`);
+    return {
+      ok: true,
+      reviews: (payload.reviews || []).map((review) => ({
+        id: review.id,
+        author: review.client?.name || "NearFIX mijoz",
+        date: review.createdAt ? new Date(review.createdAt).toLocaleDateString("uz-UZ") : "",
+        rating: review.rating,
+        text: review.text || "Izoh qoldirilmagan."
+      }))
+    };
+  });
+}
+
 export async function fetchWorkerEarningsApi(token) {
   return apiRequest(async () => {
     const payload = await httpAuthRequest("/workers/me/earnings", { token });

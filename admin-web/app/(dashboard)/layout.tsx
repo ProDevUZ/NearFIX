@@ -17,6 +17,8 @@ const routePermissions: {
   { prefix: "/workers", permission: "workers.read" },
   { prefix: "/users", permission: "users.read" },
   { prefix: "/reviews", permission: "reviews.read" },
+  { prefix: "/reports", permission: "reports.read" },
+  { prefix: "/support", permission: "support.read" },
   { prefix: "/content", permission: "content.read" },
   { prefix: "/system/admins", superAdminOnly: true }
 ];

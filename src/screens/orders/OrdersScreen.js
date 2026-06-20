@@ -10,6 +10,8 @@ import { ensureOrderChatRoomApi } from "../../services/chats/chatService";
 import { WorkerAvatar } from "../../components/ui/WorkerAvatar";
 import { useAuthStore } from "../../store/authStore";
 import { useClientStore } from "../../store/clientStore";
+import { ReportModal } from "../../components/moderation/ReportModal";
+import { SupportRequestModal } from "../../components/support/SupportRequestModal";
 
 const font = {
   medium: "Inter_500Medium",
@@ -45,6 +47,8 @@ export function OrdersScreen({ navigation }) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [reportOrderId, setReportOrderId] = useState(null);
+  const [supportOrderId, setSupportOrderId] = useState(null);
   const orders = useClientStore((state) => state.orders);
   const activeOrder = useClientStore((state) => state.activeOrder);
   const workers = useClientStore((state) => state.workers);
@@ -126,9 +130,26 @@ export function OrdersScreen({ navigation }) {
             worker={detailWorker}
             onChat={() => handleOpenChat(detailOrder)}
             onCancel={canCancel ? () => setCancelOpen(true) : undefined}
+            onReport={() => setReportOrderId(detailOrder.id)}
+            onSupport={() => setSupportOrderId(detailOrder.id)}
           />
         </ScrollView>
         <CancelReasonSheet visible={cancelOpen} onClose={() => setCancelOpen(false)} onSelectReason={handleCancel} />
+        <ReportModal
+          visible={Boolean(reportOrderId)}
+          targetType="ORDER"
+          targetId={reportOrderId}
+          title="Buyurtma muammosi haqida xabar berish"
+          onClose={() => setReportOrderId(null)}
+          onSuccess={() => Alert.alert("Shikoyat yuborildi", "Moderatorlar murojaatingizni ko‘rib chiqadi.")}
+        />
+        <SupportRequestModal
+          visible={Boolean(supportOrderId)}
+          orderId={supportOrderId}
+          initialReason="Buyurtma bo‘yicha yordam"
+          onClose={() => setSupportOrderId(null)}
+          onSuccess={() => Alert.alert("Murojaat yuborildi", "Yordam jamoasi murojaatingizni ko‘rib chiqadi.")}
+        />
       </View>
     );
   }

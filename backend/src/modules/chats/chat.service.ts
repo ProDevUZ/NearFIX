@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import type { AuthUser } from "../auth/auth-context.js";
+import { assertUsersNotBlocked } from "../blocks/block.service.js";
 import { createNotifications } from "../notifications/notification.service.js";
 
 type CreateWorkerGroupRoomInput = {
@@ -167,6 +168,8 @@ export async function ensureWorkerDirectChatRoom(user: AuthUser, workerId: strin
       code: "SELF_CHAT_NOT_ALLOWED"
     });
   }
+
+  await assertUsersNotBlocked(user.id, worker.userId);
 
   return prisma.$transaction(async (tx) => {
     const existing = await tx.chatRoom.findFirst({
@@ -339,6 +342,14 @@ export async function listMessages(user: AuthUser, roomId: string) {
 export async function createMessage(user: AuthUser, roomId: string, input: CreateMessageInput) {
   const room = await assertRoomAccess(user, roomId);
   let attachedMediaMimeType: string | null = null;
+
+  if (room.type === ChatRoomType.DIRECT) {
+    const counterpart = await prisma.chatParticipant.findFirst({
+      where: { roomId, userId: { not: user.id } },
+      select: { userId: true }
+    });
+    if (counterpart) await assertUsersNotBlocked(user.id, counterpart.userId);
+  }
 
   if (input.mediaId) {
     const media = await prisma.media.findUnique({ where: { id: input.mediaId } });

@@ -24,6 +24,8 @@ const permissionGroups: { title: string; permissions: AdminPermission[] }[] = [
   { title: "Workers", permissions: ["workers.read", "workers.manage"] },
   { title: "Orders", permissions: ["orders.read", "orders.manage"] },
   { title: "Reviews", permissions: ["reviews.read", "reviews.manage"] },
+  { title: "Reports", permissions: ["reports.read", "reports.manage"] },
+  { title: "Support", permissions: ["support.read", "support.manage"] },
   { title: "Content", permissions: ["content.read", "content.manage"] },
   { title: "Notifications", permissions: ["notifications.read", "notifications.manage"] }
 ];

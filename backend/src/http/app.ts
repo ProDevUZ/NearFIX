@@ -18,6 +18,8 @@ import { mediaRouter } from "../modules/media/media.routes.js";
 import { notificationRouter } from "../modules/notifications/notification.routes.js";
 import { orderRouter } from "../modules/orders/order.routes.js";
 import { supportRouter } from "../modules/support/support.routes.js";
+import { reportRouter } from "../modules/reports/report.routes.js";
+import { blockRouter } from "../modules/blocks/block.routes.js";
 import { workerRouter } from "../modules/workers/worker.routes.js";
 import { errorHandler } from "./error-handler.js";
 
@@ -83,6 +85,8 @@ export function createApp() {
   app.use("/media", mediaRouter);
   app.use("/notifications", notificationRouter);
   app.use("/support", supportRouter);
+  app.use("/reports", reportRouter);
+  app.use("/blocks", blockRouter);
 
   app.use(errorHandler);
 

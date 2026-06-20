@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Images, LayoutDashboard, Shield, Star, Users, Wrench } from "lucide-react";
+import { ClipboardList, Flag, Images, LayoutDashboard, LifeBuoy, Shield, Star, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, isSuperAdmin, type AdminPermission } from "@/shared/auth/permissions";
 import { useAdminSessionStore } from "@/stores/admin-session-store";
@@ -12,7 +12,9 @@ const navItems = [
   { href: "/orders", label: "Orders", icon: ClipboardList, permission: "orders.read" },
   { href: "/workers", label: "Workers", icon: Wrench, permission: "workers.read" },
   { href: "/users", label: "Users", icon: Users, permission: "users.read" },
-  { href: "/reviews", label: "Reviews", icon: Star, permission: "reviews.read" }
+  { href: "/reviews", label: "Reviews", icon: Star, permission: "reviews.read" },
+  { href: "/reports", label: "Reports", icon: Flag, permission: "reports.read" },
+  { href: "/support", label: "Support", icon: LifeBuoy, permission: "support.read" }
 ] satisfies {
   href: string;
   label: string;

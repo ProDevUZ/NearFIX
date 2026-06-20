@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, RefreshControl, S
 import { useFocusEffect } from "@react-navigation/native";
 import {
   Bell,
+  Ban,
   ChevronRight,
   Check,
   CircleHelp,
@@ -25,6 +26,8 @@ import { useAuthStore } from "../../store/authStore";
 import { useClientStore } from "../../store/clientStore";
 import { useUiStore } from "../../store/uiStore";
 import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
+import { SupportRequestModal } from "../../components/support/SupportRequestModal";
+import { fetchBlockedUsersApi, unblockUserApi } from "../../services/moderation/moderationService";
 
 const font = {
   medium: "Inter_500Medium",
@@ -61,6 +64,10 @@ export function ClientProfileScreen({ navigation, route }) {
   const [addressFormMode, setAddressFormMode] = useState("create");
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [blockedLoading, setBlockedLoading] = useState(false);
   const [addressDraft, setAddressDraft] = useState({
     title: "",
     address: "",
@@ -307,6 +314,24 @@ export function ClientProfileScreen({ navigation, route }) {
     if (!result.ok) Alert.alert("Asosiy manzil saqlanmadi", result.message || "Qayta urinib ko'ring.");
   }
 
+  async function openBlockedUsers() {
+    setBlockedOpen(true);
+    if (!session?.token) return;
+    setBlockedLoading(true);
+    const result = await fetchBlockedUsersApi(session.token);
+    setBlockedLoading(false);
+    if (result.ok) setBlockedUsers(result.blocks);
+  }
+
+  async function handleUnblock(blockedUserId) {
+    const result = await unblockUserApi(session?.token, blockedUserId);
+    if (!result.ok) {
+      Alert.alert("Blokdan chiqarilmadi", result.message || "Qayta urinib ko‘ring.");
+      return;
+    }
+    setBlockedUsers((current) => current.filter((item) => item.blockedUserId !== blockedUserId));
+  }
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -413,7 +438,8 @@ export function ClientProfileScreen({ navigation, route }) {
               </View>
             }
           />
-          <SettingRow icon={CircleHelp} iconColor="#6B7280" iconBg="#F1F5F9" title={translate(locale, "help")} />
+          <SettingRow icon={CircleHelp} iconColor="#6B7280" iconBg="#F1F5F9" title={translate(locale, "help")} onPress={() => setSupportOpen(true)} />
+          <SettingRow icon={Ban} iconColor="#EF4444" iconBg="#FEECEC" title="Bloklangan foydalanuvchilar" onPress={openBlockedUsers} />
           <SettingRow
             icon={Shield}
             iconColor="#0F80B7"
@@ -453,7 +479,49 @@ export function ClientProfileScreen({ navigation, route }) {
         onSave={handleSaveAddress}
         mode={addressFormMode}
       />
+      <SupportRequestModal
+        visible={supportOpen}
+        initialReason="Ilova bo‘yicha yordam"
+        onClose={() => setSupportOpen(false)}
+        onSuccess={() => Alert.alert("Murojaat yuborildi", "Yordam jamoasi murojaatingizni ko‘rib chiqadi.")}
+      />
+      <BlockedUsersModal
+        visible={blockedOpen}
+        loading={blockedLoading}
+        blocks={blockedUsers}
+        onUnblock={handleUnblock}
+        onClose={() => setBlockedOpen(false)}
+      />
     </View>
+  );
+}
+
+function BlockedUsersModal({ visible, loading, blocks, onUnblock, onClose }) {
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={styles.blockedSheet}>
+          <Text style={styles.modalTitle}>Bloklangan foydalanuvchilar</Text>
+          {loading ? <ActivityIndicator color="#0F80B7" /> : null}
+          {!loading && !blocks.length ? <Text style={styles.blockedEmpty}>Bloklangan foydalanuvchilar yo‘q.</Text> : null}
+          {blocks.map((block) => (
+            <View key={block.blockedUserId} style={styles.blockedRow}>
+              <View style={styles.blockedBody}>
+                <Text style={styles.blockedName}>{block.blockedUser?.name || "Foydalanuvchi"}</Text>
+                <Text style={styles.blockedRole}>{block.blockedUser?.role === "PROVIDER" ? "Usta" : "Foydalanuvchi"}</Text>
+              </View>
+              <Pressable onPress={() => onUnblock(block.blockedUserId)} style={styles.unblockButton}>
+                <Text style={styles.unblockText}>Blokdan chiqarish</Text>
+              </Pressable>
+            </View>
+          ))}
+          <Pressable onPress={onClose} style={styles.modalCancelButton}>
+            <Text style={styles.modalCancelText}>Yopish</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1154,6 +1222,57 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     padding: 16,
     gap: 10
+  },
+  blockedSheet: {
+    marginHorizontal: 16,
+    marginBottom: 22,
+    maxHeight: "70%",
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    gap: 10
+  },
+  blockedEmpty: {
+    color: "#6B7280",
+    paddingVertical: 18,
+    textAlign: "center",
+    fontFamily: font.semi
+  },
+  blockedRow: {
+    minHeight: 58,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5EEF3",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  blockedBody: {
+    flex: 1
+  },
+  blockedName: {
+    color: "#273248",
+    fontFamily: font.extra
+  },
+  blockedRole: {
+    marginTop: 3,
+    color: "#6B7280",
+    fontSize: 12,
+    fontFamily: font.semi
+  },
+  unblockButton: {
+    minHeight: 34,
+    borderRadius: 11,
+    backgroundColor: "#EAF8FC",
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  unblockText: {
+    color: "#0F80B7",
+    fontSize: 11,
+    fontFamily: font.extra
   },
   modalTitle: {
     color: "#273248",

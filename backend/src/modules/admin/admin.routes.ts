@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { OrderStatus, type Prisma } from "@prisma/client";
+import { OrderStatus, ReviewStatus, UserStatus, type Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requirePermission } from "../auth/middleware/permission.guard.js";
@@ -12,6 +12,15 @@ import {
   unsuspendWorkerProfile
 } from "../workers/worker.service.js";
 import { promoteUserToProvider } from "../users/user-role.service.js";
+import { updateReportStatusSchema } from "../reports/report.contracts.js";
+import { getAdminReport, listAdminReports, updateAdminReport } from "../reports/report.service.js";
+import { updateSupportTicketSchema } from "../support/support.contracts.js";
+import {
+  getAdminSupportTicket,
+  listAdminSupportTickets,
+  updateAdminSupportTicket
+} from "../support/support.service.js";
+import { setReviewVisibility } from "../reviews/review.service.js";
 
 export const adminRouter = Router();
 
@@ -184,6 +193,113 @@ adminRouter.get("/reviews", requirePermission("reviews.read"), async (request, r
       orderBy: { createdAt: "desc" }
     });
     response.json({ ok: true, reviews });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/reviews/:reviewId/hide", requirePermission("reviews.manage"), async (request, response, next) => {
+  try {
+    const review = await setReviewVisibility(String(request.params.reviewId), ReviewStatus.HIDDEN);
+    response.json({ ok: true, review });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/reviews/:reviewId/restore", requirePermission("reviews.manage"), async (request, response, next) => {
+  try {
+    const review = await setReviewVisibility(String(request.params.reviewId), ReviewStatus.PUBLISHED);
+    response.json({ ok: true, review });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/reports", requirePermission("reports.read"), async (request, response, next) => {
+  try {
+    response.json({ ok: true, reports: await listAdminReports(request.query) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/reports/:reportId", requirePermission("reports.read"), async (request, response, next) => {
+  try {
+    response.json({ ok: true, report: await getAdminReport(String(request.params.reportId)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/reports/:reportId/status", requirePermission("reports.manage"), async (request, response, next) => {
+  try {
+    const input = updateReportStatusSchema.parse(request.body);
+    const report = await updateAdminReport(String(request.params.reportId), request.user!.id, input);
+    response.json({ ok: true, report });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/support/tickets", requirePermission("support.read"), async (request, response, next) => {
+  try {
+    response.json({ ok: true, tickets: await listAdminSupportTickets(request.query) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/support/tickets/:ticketId", requirePermission("support.read"), async (request, response, next) => {
+  try {
+    response.json({ ok: true, ticket: await getAdminSupportTicket(String(request.params.ticketId)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/support/tickets/:ticketId", requirePermission("support.manage"), async (request, response, next) => {
+  try {
+    const input = updateSupportTicketSchema.parse(request.body);
+    const ticket = await updateAdminSupportTicket(String(request.params.ticketId), request.user!.id, input);
+    response.json({ ok: true, ticket });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/users/:userId/suspend", requirePermission("users.manage"), async (request, response, next) => {
+  try {
+    const userId = String(request.params.userId);
+    if (userId === request.user!.id) {
+      throw Object.assign(new Error("Admins cannot suspend their own account"), {
+        status: 409,
+        code: "ADMIN_SELF_SUSPEND_FORBIDDEN"
+      });
+    }
+    const user = await prisma.$transaction(async (tx) => {
+      const target = await tx.user.findUnique({ where: { id: userId }, select: { role: true, status: true } });
+      if (!target) throw Object.assign(new Error("User not found"), { status: 404, code: "USER_NOT_FOUND" });
+      if (target.role === "ADMIN" || target.role === "SUPER_ADMIN") {
+        throw Object.assign(new Error("Admin accounts must be managed from Admins"), {
+          status: 403,
+          code: "ADMIN_SUSPEND_FORBIDDEN"
+        });
+      }
+      if (target.status === UserStatus.DELETED) {
+        throw Object.assign(new Error("Deleted accounts cannot be suspended"), {
+          status: 409,
+          code: "DELETED_USER_SUSPEND_FORBIDDEN"
+        });
+      }
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { status: UserStatus.BLOCKED, sessionVersion: { increment: 1 } }
+      });
+      await tx.session.updateMany({ where: { userId, revoked: false }, data: { revoked: true } });
+      return updated;
+    });
+    response.json({ ok: true, user });
   } catch (error) {
     next(error);
   }
