@@ -106,10 +106,6 @@ export function WorkerDashboardScreen({ navigation }) {
     Alert.alert("Chat ochilmadi", result.message || "Mijoz bilan chatni ochishda xatolik yuz berdi.");
   }
 
-  function handleNavigateToJob() {
-    Alert.alert("Yo'nalish", activeJob?.address || "Buyurtma manzili mavjud emas.");
-  }
-
   async function handleRefresh() {
     setRefreshing(true);
     await syncWorkerFromApi();
@@ -138,7 +134,6 @@ export function WorkerDashboardScreen({ navigation }) {
             <ActiveJobCard
               job={activeJob}
               onChat={handleOpenJobChat}
-              onNavigate={handleNavigateToJob}
               onUpdateStatus={handleUpdateStatus}
               onComplete={handleComplete}
             />

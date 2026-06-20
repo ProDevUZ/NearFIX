@@ -6,6 +6,7 @@ import { OrderTimeline } from "./OrderTimeline";
 import { StatusBadge } from "./StatusBadge";
 import { trackingStatusCopy, TRACKING_STATUSES } from "../../constants/orderTracking";
 import { workerStatusCopy } from "../../constants/workerStatus";
+import { env } from "../../constants/env";
 import { WorkerAvatar } from "../ui/WorkerAvatar";
 import { colors, iconSizes, radius, shadow } from "../../theme";
 
@@ -58,13 +59,15 @@ export function ActiveOrderCard({ order, worker, onChat, onCancel, onReport, onS
 
       <WorkerSummary worker={worker} onChat={onChat} />
 
-      <View style={styles.paymentCard}>
-        <ShieldCheck size={iconSizes.md} color={colors.success} strokeWidth={2.5} />
-        <View style={styles.paymentBody}>
-          <Text style={styles.paymentTitle}>To'lov ish yakunlangandan keyin</Text>
-          <Text style={styles.paymentText}>Buyurtma NearFIX kafolati ostida. Narx yakuniy ish hajmidan keyin tasdiqlanadi.</Text>
+      {env.paymentsEnabled ? (
+        <View style={styles.paymentCard}>
+          <ShieldCheck size={iconSizes.md} color={colors.success} strokeWidth={2.5} />
+          <View style={styles.paymentBody}>
+            <Text style={styles.paymentTitle}>To'lov ish yakunlangandan keyin</Text>
+            <Text style={styles.paymentText}>Buyurtma NearFIX kafolati ostida. Narx yakuniy ish hajmidan keyin tasdiqlanadi.</Text>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.chatTools}>
         <View style={styles.uploadTool}>

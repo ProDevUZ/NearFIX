@@ -39,7 +39,7 @@
     "extra": {
       "authEnabled": false,
       "paymentsEnabled": false,
-      "apiBaseUrl": "mock://nearfix"
+      "apiBaseUrl": "https://nearfix-production-c0db.up.railway.app"
     }
   }
 }

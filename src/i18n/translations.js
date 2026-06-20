@@ -11,7 +11,6 @@ export const translations = {
     notifications: "Bildirishnomalar",
     chats: "Chatlar",
     profile: "Profil",
-    paymentMethods: "To'lov usullari",
     add: "Qo'shish",
     settings: "Sozlamalar",
     personalInfo: "Shaxsiy ma'lumotlar",
@@ -25,8 +24,7 @@ export const translations = {
     logoutTitle: "Hisobdan chiqish",
     logoutMessage: "Akkauntingizdan chiqmoqchimisiz?",
     cancel: "Bekor qilish",
-    confirmLogout: "Chiqish",
-    paymentComingSoon: "To'lov kartalari keyingi bosqichda ulanadi"
+    confirmLogout: "Chiqish"
   },
   en: {
     home: "Home",
@@ -34,7 +32,6 @@ export const translations = {
     notifications: "Notifications",
     chats: "Chats",
     profile: "Profile",
-    paymentMethods: "Payment methods",
     add: "Add",
     settings: "Settings",
     personalInfo: "Personal information",
@@ -48,8 +45,7 @@ export const translations = {
     logoutTitle: "Logout",
     logoutMessage: "Do you want to sign out?",
     cancel: "Cancel",
-    confirmLogout: "Logout",
-    paymentComingSoon: "Payment cards will be connected in the next stage"
+    confirmLogout: "Logout"
   },
   ru: {
     home: "Главная",
@@ -57,7 +53,6 @@ export const translations = {
     notifications: "Уведомления",
     chats: "Чаты",
     profile: "Профиль",
-    paymentMethods: "Способы оплаты",
     add: "Добавить",
     settings: "Настройки",
     personalInfo: "Личные данные",
@@ -71,8 +66,7 @@ export const translations = {
     logoutTitle: "Выход",
     logoutMessage: "Вы хотите выйти из аккаунта?",
     cancel: "Отмена",
-    confirmLogout: "Выйти",
-    paymentComingSoon: "Платежные карты будут подключены на следующем этапе"
+    confirmLogout: "Выйти"
   }
 };
 

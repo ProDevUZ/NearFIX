@@ -162,7 +162,6 @@ export function WorkerJobsScreen({ navigation }) {
                 key={job.id}
                 job={job}
                 onChat={handleOpenJobChat}
-                onNavigate={() => Alert.alert("Yo'nalish", job.address || "Buyurtma manzili mavjud emas.")}
                 onUpdateStatus={handleUpdateStatus}
                 onComplete={handleComplete}
               />

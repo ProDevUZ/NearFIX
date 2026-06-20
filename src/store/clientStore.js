@@ -352,31 +352,6 @@ export const useClientStore = create((set, get) => ({
   removeSavedAddress: async (addressId) => {
     return get().removeAddress(addressId);
   },
-  addSavedAddressMock: async (address) => {
-    const token = useAuthStore.getState().session?.token;
-
-    if (token) {
-      const result = await createAddressApi(token, address);
-      if (result.ok) {
-        set((state) => ({
-          savedAddresses: [...state.savedAddresses, result.address]
-        }));
-        return result;
-      }
-    }
-
-    set((state) => ({
-      savedAddresses: [
-        ...state.savedAddresses,
-        {
-          id: `address-${Date.now()}`,
-          ...address
-        }
-      ]
-    }));
-
-    return { ok: true, source: "mock" };
-  },
   selectWorker: (workerId) => set({ selectedWorkerId: workerId }),
   getSelectedWorker: () => {
     const { selectedWorkerId, workers: workerList } = get();

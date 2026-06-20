@@ -1,11 +1,11 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Clock3, MapPin, MessageCircle, Navigation, Star } from "lucide-react-native";
+import { Clock3, MapPin, MessageCircle, Star } from "lucide-react-native";
 import { trackingStatusCopy, TRACKING_STATUSES } from "../../constants/orderTracking";
 import { colors, iconSizes, radius, shadow } from "../../theme";
 import { OrderActions } from "./OrderActions";
 
-export function ActiveJobCard({ job, onChat, onNavigate, onUpdateStatus, onComplete }) {
+export function ActiveJobCard({ job, onChat, onUpdateStatus, onComplete }) {
   if (!job) return null;
 
   const category = job.service || "Xizmat";
@@ -63,10 +63,6 @@ export function ActiveJobCard({ job, onChat, onNavigate, onUpdateStatus, onCompl
             <Text style={styles.chatText}>Chat</Text>
           </Pressable>
         ) : null}
-        <Pressable onPress={onNavigate} style={({ pressed }) => [styles.navigateButton, pressed && styles.pressed]}>
-          <Navigation size={13} color={colors.white} strokeWidth={2.5} />
-          <Text style={styles.navigateText}>Yo'nalish</Text>
-        </Pressable>
       </View>
 
       {onUpdateStatus && onComplete ? (
@@ -185,16 +181,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600"
   },
-  navigateButton: {
-    minHeight: 34,
-    borderRadius: radius.pill,
-    backgroundColor: "#FF6B1A",
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5
-  },
   chatButton: {
     minHeight: 34,
     borderRadius: radius.pill,
@@ -207,11 +193,6 @@ const styles = StyleSheet.create({
   },
   chatText: {
     color: colors.primary,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  navigateText: {
-    color: colors.white,
     fontSize: 12,
     fontWeight: "900"
   },

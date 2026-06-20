@@ -1,5 +1,4 @@
 import { apiClient, getAdminToken } from "@/services/api-client";
-import { orders } from "@/services/mock-data";
 import type { AdminOrder, AdminOrderDetail, City, OrderStatus } from "@/contracts/admin";
 
 export type AdminOrdersQuery = {
@@ -124,34 +123,9 @@ function buildQueryString(query: AdminOrdersQuery) {
   return value ? `?${value}` : "";
 }
 
-function filterMockOrders(query: AdminOrdersQuery) {
-  const search = query.search?.trim().toLowerCase();
-
-  return orders.filter((order) => {
-    if (query.status && order.status !== query.status) return false;
-    if (query.cityId && order.city !== query.cityId) return false;
-    if (search && !`${order.id} ${order.client} ${order.worker} ${order.service}`.toLowerCase().includes(search)) return false;
-    return true;
-  });
-}
-
 export async function getOrders(query: AdminOrdersQuery = {}): Promise<AdminOrdersResult> {
   const token = getAdminToken();
-  const page = query.page || 1;
-  const limit = query.limit || 20;
-
-  if (!token) {
-    const filtered = filterMockOrders(query);
-    const start = (page - 1) * limit;
-
-    return {
-      items: filtered.slice(start, start + limit).map((order) => ({ ...order, orderId: order.id })),
-      total: filtered.length,
-      page,
-      limit,
-      totalPages: Math.max(1, Math.ceil(filtered.length / limit))
-    };
-  }
+  if (!token) throw new Error("Admin authentication required");
 
   const payload = await apiClient<{
     ok: boolean;
@@ -173,30 +147,7 @@ export async function getOrders(query: AdminOrdersQuery = {}): Promise<AdminOrde
 
 export async function getOrderDetail(orderId: string): Promise<AdminOrderDetail> {
   const token = getAdminToken();
-  if (!token) {
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) throw new Error("Order not found");
-
-    return {
-      id: order.id,
-      publicCode: order.id,
-      status: order.status,
-      createdAt: order.createdAt,
-      client: { id: "", name: order.client, phone: "" },
-      worker: { id: "", name: order.worker, phone: "", profession: order.service, availability: "" },
-      address: null,
-      city: order.city,
-      service: order.service,
-      problemTitle: order.service,
-      problemDescription: undefined,
-      priceEstimate: order.amount,
-      finalAmount: null,
-      responseDeadline: null,
-      cancelReason: null,
-      payments: [],
-      timeline: []
-    };
-  }
+  if (!token) throw new Error("Admin authentication required");
 
   const payload = await apiClient<{ ok: boolean; order: any }>(`/orders/${orderId}`, { token });
   return mapOrderDetail(payload.order);

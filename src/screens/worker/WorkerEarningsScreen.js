@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, DollarSign } from "lucide-react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import { env } from "../../constants/env";
 import { useWorkerStore } from "../../store/workerStore";
 import { radius } from "../../theme";
 
@@ -63,7 +64,7 @@ export function WorkerEarningsScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Daromad</Text>
-        <Text style={styles.subtitle}>May 2026 - to'lov har dushanba</Text>
+        {env.paymentsEnabled ? <Text style={styles.subtitle}>May 2026 - to'lov har dushanba</Text> : null}
       </View>
 
       <View style={styles.segment}>

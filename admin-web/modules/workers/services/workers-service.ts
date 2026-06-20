@@ -1,5 +1,4 @@
 import { apiClient, getAdminToken } from "@/services/api-client";
-import { workers } from "@/services/mock-data";
 import type { AdminWorker, City, WorkerAvailability, WorkerProfileStatus } from "@/contracts/admin";
 
 function mapAvailability(status: string): WorkerAvailability {
@@ -16,7 +15,7 @@ function mapWorkerStatus(status: string): WorkerProfileStatus {
 
 export async function getWorkers(): Promise<AdminWorker[]> {
   const token = getAdminToken();
-  if (!token) return workers;
+  if (!token) throw new Error("Admin authentication required");
 
   const payload = await apiClient<{ ok: boolean; workers: any[] }>("/admin/workers", { token });
   return payload.workers.map((worker) => ({

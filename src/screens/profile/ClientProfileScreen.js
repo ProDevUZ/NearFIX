@@ -16,7 +16,6 @@ import {
   Shield,
   Trash2,
   UserRound,
-  WalletCards,
   Wrench
 } from "lucide-react-native";
 import { ROUTES } from "../../constants/routes";
@@ -132,10 +131,6 @@ export function ClientProfileScreen({ navigation, route }) {
         onPress: logout
       }
     ]);
-  }
-
-  function showComingSoon() {
-    Alert.alert("NearFIX", translate(locale, "paymentComingSoon"));
   }
 
   function confirmDeleteAccount() {
@@ -358,16 +353,6 @@ export function ClientProfileScreen({ navigation, route }) {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>{translate(locale, "paymentMethods")}</Text>
-        <View style={styles.paymentEmpty}>
-          <Text style={styles.paymentEmptyTitle}>To'lov kartalari yo'q</Text>
-          <Text style={styles.paymentEmptyText}>Payment integratsiya ulangandan keyin kartalar shu yerda ko'rinadi.</Text>
-          <Pressable onPress={showComingSoon} style={styles.addCard}>
-            <Plus size={23} color="#6B7280" strokeWidth={2.7} />
-            <Text style={styles.addCardText}>{translate(locale, "add")}</Text>
-          </Pressable>
-        </View>
-
         <Text style={styles.sectionTitle}>{translate(locale, "settings")}</Text>
         <View style={styles.settingsCard}>
           <SettingRow
@@ -393,8 +378,6 @@ export function ClientProfileScreen({ navigation, route }) {
               </View>
             }
           />
-          <SettingRow icon={Shield} iconColor="#2CD8A5" iconBg="#E9FFF7" title={translate(locale, "security")} />
-          <SettingRow icon={WalletCards} iconColor="#F59E0B" iconBg="#FFF4E0" title={translate(locale, "paymentMethods")} />
           <SettingRow
             icon={MapPin}
             iconColor="#0F80B7"
@@ -815,93 +798,6 @@ const styles = StyleSheet.create({
     color: "#273248",
     fontSize: 18,
     lineHeight: 23,
-    fontFamily: font.extra
-  },
-  paymentRow: {
-    marginTop: 20,
-    paddingLeft: 24,
-    paddingRight: 24,
-    gap: 14
-  },
-  paymentEmpty: {
-    marginTop: 10,
-    marginHorizontal: 18,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5EEF3",
-    padding: 14,
-    gap: 8
-  },
-  paymentEmptyTitle: {
-    color: "#273248",
-    fontSize: 15,
-    fontFamily: font.extra
-  },
-  paymentEmptyText: {
-    color: "#6B7280",
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: font.semi
-  },
-  addCard: {
-    width: 116,
-    height: 64,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: "#C7D2DE",
-    backgroundColor: "#F8FAFC",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  },
-  addCardText: {
-    color: "#6B7280",
-    fontSize: 13,
-    fontFamily: font.bold
-  },
-  bankCard: {
-    width: 168,
-    height: 88,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#E5EEF3",
-    backgroundColor: "#FFFFFF",
-    padding: 17,
-    justifyContent: "center",
-    shadowColor: "#0F719D",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 14,
-    elevation: 3
-  },
-  bankTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  bankTitle: {
-    fontSize: 16,
-    fontFamily: font.extra
-  },
-  cardCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#2CD8A5",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  cardCheckText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontFamily: font.extra
-  },
-  cardDigits: {
-    marginTop: 10,
-    color: "#273248",
-    fontSize: 17,
     fontFamily: font.extra
   },
   settingsCard: {
