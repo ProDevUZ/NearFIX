@@ -1,33 +1,77 @@
 import { apiRequest, httpRequest } from "../api/client";
 
-export async function requestOtp(phone) {
+function authSessionResult(payload) {
+  return {
+    ok: true,
+    token: payload.token,
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken,
+    user: payload.user
+  };
+}
+
+function otpRequestResult(payload) {
+  return {
+    ok: true,
+    expiresIn: payload.expiresIn,
+    resendIn: payload.resendIn
+  };
+}
+
+export async function loginWithPassword(phone, password) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/otp/request", {
+    const payload = await httpRequest("/auth/login", {
+      method: "POST",
+      body: { phone, password }
+    });
+
+    return authSessionResult(payload);
+  });
+}
+
+export async function requestRegisterOtp(phone) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/register/otp/request", {
       method: "POST",
       body: { phone }
     });
 
-    return {
-      ok: true,
-      expiresIn: payload.expiresIn,
-      resendIn: payload.resendIn
-    };
+    return otpRequestResult(payload);
   });
 }
 
-export async function verifyOtp(phone, code) {
+export async function verifyRegisterOtp(phone, code, password) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/otp/verify", {
+    const payload = await httpRequest("/auth/register/otp/verify", {
       method: "POST",
-      body: { phone, code }
+      body: { phone, code, password }
+    });
+
+    return authSessionResult(payload);
+  });
+}
+
+export async function requestForgotPasswordOtp(phone) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/password/forgot/request", {
+      method: "POST",
+      body: { phone }
+    });
+
+    return otpRequestResult(payload);
+  });
+}
+
+export async function verifyForgotPasswordOtp(phone, code, newPassword) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/password/forgot/verify", {
+      method: "POST",
+      body: { phone, code, newPassword }
     });
 
     return {
       ok: true,
-      token: payload.token,
-      accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
-      user: payload.user
+      passwordUpdated: payload.passwordUpdated
     };
   });
 }

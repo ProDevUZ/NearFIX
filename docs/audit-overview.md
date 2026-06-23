@@ -182,7 +182,11 @@ sequenceDiagram
 |---|---|---|---|
 | `GET` | `/health` | no | health check |
 | `GET` | `/workers/catalog` | no | approved worker catalog by `cityId`, `profession/category` |
-| `POST` | `/auth/phone` | no | phone login/register |
+| `POST` | `/auth/register/otp/request` | no | request registration OTP |
+| `POST` | `/auth/register/otp/verify` | no | verify registration OTP, set password and create session |
+| `POST` | `/auth/login` | no | phone/password login |
+| `POST` | `/auth/password/forgot/request` | no | request password-reset OTP |
+| `POST` | `/auth/password/forgot/verify` | no | verify password-reset OTP and set new password |
 | `POST` | `/auth/refresh` | no | refresh access token |
 
 ### Authenticated
@@ -382,4 +386,3 @@ Before production:
 - Mobile Expo: `exp://192.168.0.105:8081`
 - Backend: `http://localhost:4000`
 - Admin web: `http://localhost:3000`
-

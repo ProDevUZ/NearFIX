@@ -1,5 +1,7 @@
 import { PrismaClient, UserRole, UserStatus, WorkerAvailabilityStatus, WorkerProfileStatus } from "@prisma/client";
 import { parseEnv } from "../src/config/env.js";
+import { hashPassword } from "../src/modules/auth/password.js";
+import { normalizePhone } from "../src/utils/phone.js";
 
 const prisma = new PrismaClient();
 const env = parseEnv(process.env);
@@ -9,19 +11,26 @@ function maskPhone(phone: string) {
 }
 
 async function main() {
-  if (!env.APP_REVIEW_OTP_ENABLED) {
-    throw new Error("APP_REVIEW_OTP_ENABLED must be true before preparing review accounts");
+  const credentials = [
+    env.APP_REVIEW_CLIENT_PHONE,
+    env.APP_REVIEW_CLIENT_PASSWORD,
+    env.APP_REVIEW_WORKER_PHONE,
+    env.APP_REVIEW_WORKER_PASSWORD
+  ];
+
+  if (credentials.some((value) => !value)) {
+    throw new Error(
+      "APP_REVIEW_CLIENT_PHONE, APP_REVIEW_CLIENT_PASSWORD, APP_REVIEW_WORKER_PHONE and APP_REVIEW_WORKER_PASSWORD are required"
+    );
   }
 
-  const phones = env.APP_REVIEW_PHONE_NUMBERS.split(",")
-    .map((phone) => phone.trim())
-    .filter(Boolean);
-
-  if (phones.length < 2) {
-    throw new Error("Configure at least two allowlisted numbers: demo client first, demo worker second");
-  }
-
-  const [clientPhone, workerPhone] = phones;
+  const clientPhone = normalizePhone(env.APP_REVIEW_CLIENT_PHONE!);
+  const workerPhone = normalizePhone(env.APP_REVIEW_WORKER_PHONE!);
+  const [clientPasswordHash, workerPasswordHash] = await Promise.all([
+    hashPassword(env.APP_REVIEW_CLIENT_PASSWORD!),
+    hashPassword(env.APP_REVIEW_WORKER_PASSWORD!)
+  ]);
+  const passwordSetAt = new Date();
 
   const client = await prisma.user.upsert({
     where: { phone: clientPhone },
@@ -29,14 +38,19 @@ async function main() {
       name: "App Review Client",
       role: UserRole.CLIENT,
       status: UserStatus.ACTIVE,
-      deletedAt: null
+      deletedAt: null,
+      passwordHash: clientPasswordHash,
+      passwordSetAt,
+      sessionVersion: { increment: 1 }
     },
     create: {
       phone: clientPhone,
       name: "App Review Client",
       role: UserRole.CLIENT,
       status: UserStatus.ACTIVE,
-      cityId: "tashkent"
+      cityId: "tashkent",
+      passwordHash: clientPasswordHash,
+      passwordSetAt
     }
   });
 
@@ -47,14 +61,31 @@ async function main() {
       role: UserRole.PROVIDER,
       status: UserStatus.ACTIVE,
       deletedAt: null,
-      cityId: "tashkent"
+      cityId: "tashkent",
+      passwordHash: workerPasswordHash,
+      passwordSetAt,
+      sessionVersion: { increment: 1 }
     },
     create: {
       phone: workerPhone,
       name: "App Review Worker",
       role: UserRole.PROVIDER,
       status: UserStatus.ACTIVE,
-      cityId: "tashkent"
+      cityId: "tashkent",
+      passwordHash: workerPasswordHash,
+      passwordSetAt
+    }
+  });
+
+  await prisma.session.updateMany({
+    where: {
+      userId: {
+        in: [client.id, workerUser.id]
+      },
+      revoked: false
+    },
+    data: {
+      revoked: true
     }
   });
 
@@ -103,7 +134,7 @@ async function main() {
         prepared: true,
         client: maskPhone(client.phone),
         worker: maskPhone(workerUser.phone),
-        otpCodePrinted: false
+        passwordsPrinted: false
       },
       null,
       2

@@ -37,7 +37,7 @@
       }
     },
     "extra": {
-      "authEnabled": false,
+      "authEnabled": true,
       "paymentsEnabled": false,
       "apiBaseUrl": "https://nearfix-production-c0db.up.railway.app"
     }

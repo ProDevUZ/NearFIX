@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { OtpPurpose, Prisma } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
 import { normalizePhone } from "../../utils/phone.js";
@@ -52,7 +52,7 @@ export class OtpService {
   readonly phoneRateLimit = OTP_PHONE_RATE_LIMIT;
   readonly phoneRateWindowMinutes = OTP_PHONE_RATE_WINDOW_MINUTES;
 
-  async createChallenge(phone: string, codeOverride?: string) {
+  async createChallenge(phone: string, purpose: OtpPurpose, codeOverride?: string) {
     const normalizedPhone = normalizePhone(phone);
 
     return prisma.$transaction(async (tx) => {
@@ -62,6 +62,7 @@ export class OtpService {
       const activeChallenge = await tx.otpChallenge.findFirst({
         where: {
           phone: normalizedPhone,
+          purpose,
           consumedAt: null,
           expiresAt: {
             gt: now
@@ -94,6 +95,7 @@ export class OtpService {
       await tx.otpChallenge.updateMany({
         where: {
           phone: normalizedPhone,
+          purpose,
           consumedAt: null
         },
         data: {
@@ -106,6 +108,7 @@ export class OtpService {
       const challenge = await tx.otpChallenge.create({
         data: {
           phone: normalizedPhone,
+          purpose,
           codeHash,
           expiresAt: addMinutes(now, OTP_TTL_MINUTES),
           attempts: 0,
@@ -121,12 +124,13 @@ export class OtpService {
     });
   }
 
-  async findActiveChallenge(phone: string) {
+  async findActiveChallenge(phone: string, purpose: OtpPurpose) {
     const normalizedPhone = normalizePhone(phone);
 
     return prisma.otpChallenge.findFirst({
       where: {
         phone: normalizedPhone,
+        purpose,
         consumedAt: null,
         expiresAt: {
           gt: new Date()
@@ -141,12 +145,13 @@ export class OtpService {
     });
   }
 
-  async findLatestChallenge(phone: string) {
+  async findLatestChallenge(phone: string, purpose: OtpPurpose) {
     const normalizedPhone = normalizePhone(phone);
 
     return prisma.otpChallenge.findFirst({
       where: {
-        phone: normalizedPhone
+        phone: normalizedPhone,
+        purpose
       },
       orderBy: {
         createdAt: "desc"
@@ -167,10 +172,10 @@ export class OtpService {
     });
   }
 
-  async assertCanRequest(phone: string) {
+  async assertCanRequest(phone: string, purpose: OtpPurpose) {
     const normalizedPhone = normalizePhone(phone);
     const now = new Date();
-    const activeChallenge = await this.findActiveChallenge(normalizedPhone);
+    const activeChallenge = await this.findActiveChallenge(normalizedPhone, purpose);
 
     if (activeChallenge && activeChallenge.resendAfter > now) {
       throw otpError("OTP resend cooldown is active", 429, "OTP_COOLDOWN", {
@@ -253,9 +258,9 @@ export class OtpService {
     });
   }
 
-  async verifyChallenge(phone: string, code: string) {
+  async verifyChallenge(phone: string, purpose: OtpPurpose, code: string) {
     const normalizedPhone = normalizePhone(phone);
-    const challenge = await this.findLatestChallenge(normalizedPhone);
+    const challenge = await this.findLatestChallenge(normalizedPhone, purpose);
     const now = new Date();
 
     if (!challenge) {

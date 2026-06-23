@@ -20,6 +20,11 @@ enum UserStatus {
   DELETED
 }
 
+enum OtpPurpose {
+  REGISTER
+  PASSWORD_RESET
+}
+
 enum WorkerProfileStatus {
   DRAFT
   APPROVED
@@ -177,6 +182,8 @@ model User {
   role           UserRole   @default(CLIENT)
   status         UserStatus @default(ACTIVE)
   cityId         String?
+  passwordHash   String?
+  passwordSetAt  DateTime?
   sessionVersion Int        @default(1)
   deletedAt      DateTime?
   createdAt      DateTime   @default(now())
@@ -234,6 +241,7 @@ model Session {
 model OtpChallenge {
   id                String    @id @default(cuid())
   phone             String
+  purpose           OtpPurpose
   codeHash          String
   expiresAt         DateTime
   attempts          Int       @default(0)
@@ -244,7 +252,7 @@ model OtpChallenge {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  @@index([phone])
+  @@index([phone, purpose])
   @@index([expiresAt])
   @@index([consumedAt])
 }

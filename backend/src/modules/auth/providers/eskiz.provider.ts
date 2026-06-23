@@ -102,8 +102,4 @@ export class EskizAuthProvider implements AuthProvider {
       providerMessageId: payload.id
     };
   }
-
-  async verifyOtp() {
-    return false;
-  }
 }

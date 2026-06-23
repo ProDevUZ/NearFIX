@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
+import { OtpPurpose } from "@prisma/client";
 import { ZodError } from "zod";
 import { parseEnv } from "../src/config/env.js";
 import { prisma } from "../src/db/prisma.js";
-import { requestOtp, verifyOtpAndCreateSession } from "../src/modules/auth/auth.service.js";
 import { otpService, hashOtpCode } from "../src/modules/auth/otp.service.js";
 import { normalizePhone } from "../src/utils/phone.js";
 
@@ -44,10 +44,10 @@ function getErrorCode(result: PromiseSettledResult<unknown>) {
 
 async function testDoubleVerifyRace() {
   const phone = phones[0];
-  const { code } = await otpService.createChallenge(phone);
+  const { code } = await otpService.createChallenge(phone, OtpPurpose.REGISTER);
 
   const results = await Promise.allSettled(
-    Array.from({ length: 10 }, () => verifyOtpAndCreateSession({ phone, code }))
+    Array.from({ length: 10 }, () => otpService.verifyChallenge(phone, OtpPurpose.REGISTER, code))
   );
   const successCount = results.filter((result) => result.status === "fulfilled").length;
   const invalidCount = results.filter((result) => getErrorCode(result) === "OTP_INVALID").length;
@@ -58,11 +58,14 @@ async function testDoubleVerifyRace() {
 
 async function testDoubleRequestRaceAndActiveUniqueness() {
   const phone = phones[1];
-  const results = await Promise.allSettled(Array.from({ length: 10 }, () => requestOtp({ phone })));
+  const results = await Promise.allSettled(
+    Array.from({ length: 10 }, () => otpService.createChallenge(phone, OtpPurpose.REGISTER))
+  );
   const successCount = results.filter((result) => result.status === "fulfilled").length;
   const activeCount = await prisma.otpChallenge.count({
     where: {
       phone,
+      purpose: OtpPurpose.REGISTER,
       consumedAt: null
     }
   });
@@ -73,9 +76,9 @@ async function testDoubleRequestRaceAndActiveUniqueness() {
 
 async function testCooldownBypass() {
   const phone = phones[2];
-  await requestOtp({ phone });
+  await otpService.createChallenge(phone, OtpPurpose.REGISTER);
 
-  const result = await Promise.allSettled([requestOtp({ phone })]);
+  const result = await Promise.allSettled([otpService.createChallenge(phone, OtpPurpose.REGISTER)]);
   assert.equal(getErrorCode(result[0]), "OTP_COOLDOWN", "second request inside cooldown must be rejected");
 }
 
@@ -87,6 +90,7 @@ async function testPhoneRateLimitBypass() {
   await prisma.otpChallenge.createMany({
     data: Array.from({ length: 4 }, (_, index) => ({
       phone: normalizedPhone,
+      purpose: OtpPurpose.REGISTER,
       codeHash: hashOtpCode(normalizedPhone, String(1000 + index)),
       expiresAt: addMinutes(now, 5),
       attempts: 0,
@@ -97,7 +101,9 @@ async function testPhoneRateLimitBypass() {
     }))
   });
 
-  await Promise.allSettled(Array.from({ length: 10 }, () => requestOtp({ phone })));
+  await Promise.allSettled(
+    Array.from({ length: 10 }, () => otpService.createChallenge(phone, OtpPurpose.REGISTER))
+  );
   const recentCount = await prisma.otpChallenge.count({
     where: {
       phone: normalizedPhone,

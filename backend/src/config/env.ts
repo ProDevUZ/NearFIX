@@ -30,12 +30,10 @@ const envSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
     CORS_ORIGINS: z.string().default(""),
     OTP_PROVIDER: z.enum(["fake", "eskiz"]).default("fake"),
-    APP_REVIEW_OTP_ENABLED: z
-      .string()
-      .optional()
-      .transform((value) => value === "true" || value === "1"),
-    APP_REVIEW_PHONE_NUMBERS: z.string().default(""),
-    APP_REVIEW_OTP_CODE: optionalNonEmptyString,
+    APP_REVIEW_CLIENT_PHONE: optionalNonEmptyString,
+    APP_REVIEW_CLIENT_PASSWORD: optionalNonEmptyString,
+    APP_REVIEW_WORKER_PHONE: optionalNonEmptyString,
+    APP_REVIEW_WORKER_PASSWORD: optionalNonEmptyString,
     PRIVACY_POLICY_URL: optionalUrl,
     TERMS_URL: optionalUrl,
     ESKIZ_EMAIL: optionalNonEmptyString,
@@ -88,38 +86,6 @@ const envSchema = z
       }
     }
 
-    if (value.APP_REVIEW_OTP_ENABLED) {
-      const reviewPhones = value.APP_REVIEW_PHONE_NUMBERS.split(",")
-        .map((phone) => phone.trim())
-        .filter(Boolean);
-
-      if (!reviewPhones.length) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["APP_REVIEW_PHONE_NUMBERS"],
-          message: "APP_REVIEW_PHONE_NUMBERS is required when App Review OTP is enabled"
-        });
-      }
-
-      for (const phone of reviewPhones) {
-        if (!/^\+998\d{9}$/.test(phone)) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["APP_REVIEW_PHONE_NUMBERS"],
-            message: "App Review phone numbers must use exact +998XXXXXXXXX format"
-          });
-        }
-      }
-
-      if (!value.APP_REVIEW_OTP_CODE || !/^\d{6,12}$/.test(value.APP_REVIEW_OTP_CODE)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["APP_REVIEW_OTP_CODE"],
-          message: "APP_REVIEW_OTP_CODE must contain 6 to 12 digits when App Review OTP is enabled"
-        });
-      }
-    }
-
     if (value.NODE_ENV === "production") {
       const requiredR2Fields = [
         ["R2_ACCOUNT_ID", value.R2_ACCOUNT_ID],
@@ -153,9 +119,10 @@ export function parseEnv(source: NodeJS.ProcessEnv) {
     SESSION_TTL_DAYS: source.SESSION_TTL_DAYS,
     CORS_ORIGINS: source.CORS_ORIGINS,
     OTP_PROVIDER: source.OTP_PROVIDER,
-    APP_REVIEW_OTP_ENABLED: source.APP_REVIEW_OTP_ENABLED,
-    APP_REVIEW_PHONE_NUMBERS: source.APP_REVIEW_PHONE_NUMBERS,
-    APP_REVIEW_OTP_CODE: source.APP_REVIEW_OTP_CODE,
+    APP_REVIEW_CLIENT_PHONE: source.APP_REVIEW_CLIENT_PHONE,
+    APP_REVIEW_CLIENT_PASSWORD: source.APP_REVIEW_CLIENT_PASSWORD,
+    APP_REVIEW_WORKER_PHONE: source.APP_REVIEW_WORKER_PHONE,
+    APP_REVIEW_WORKER_PASSWORD: source.APP_REVIEW_WORKER_PASSWORD,
     PRIVACY_POLICY_URL: source.PRIVACY_POLICY_URL,
     TERMS_URL: source.TERMS_URL,
     ESKIZ_EMAIL: source.ESKIZ_EMAIL,

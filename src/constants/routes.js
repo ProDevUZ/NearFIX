@@ -2,6 +2,8 @@ export const ROUTES = {
   ONBOARDING_TRUST: "OnboardingTrust",
   ONBOARDING_BOOKING: "OnboardingBooking",
   LOGIN: "Login",
+  REGISTER: "Register",
+  FORGOT_PASSWORD: "ForgotPassword",
   SESSION_INVALIDATED: "SessionInvalidated",
   CLIENT_TABS: "ClientTabs",
   WORKER_TABS: "WorkerTabs",

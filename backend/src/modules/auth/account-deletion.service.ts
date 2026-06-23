@@ -90,6 +90,8 @@ export async function deleteCurrentUserAccount(userId: string) {
         phone: deletedPhone(userId),
         name: "O'chirilgan foydalanuvchi",
         cityId: null,
+        passwordHash: null,
+        passwordSetAt: null,
         status: UserStatus.DELETED,
         deletedAt,
         sessionVersion: {

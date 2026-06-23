@@ -3,10 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
   deleteCurrentUserApi,
-  verifyOtp as verifyOtpApi,
+  loginWithPassword as loginWithPasswordApi,
   logoutApi,
   getCurrentUserApi,
   refreshAccessTokenApi,
+  verifyRegisterOtp,
   updateCurrentUserApi
 } from "../services/auth";
 
@@ -31,26 +32,27 @@ export const useAuthStore = create(
   invalidation: null,
   hasHydrated: false,
   setHasHydrated: (value) => set({ hasHydrated: value }),
-  verifyOtp: async (phone, code, name) => {
-    const apiResult = await verifyOtpApi(phone || "+998", code);
+  login: async (phone, password) => {
+    const apiResult = await loginWithPasswordApi(phone || "+998", password);
     if (!apiResult.ok) return apiResult;
 
-    let user = apiResult.user;
-    const accessToken = apiResult.accessToken || apiResult.token;
-
-    if (name && name !== user.name) {
-      const profileResult = await updateCurrentUserApi(accessToken, { name });
-      if (profileResult.ok) {
-        user = profileResult.user;
-      }
-    }
-
     set({
-      session: toSession(apiResult, user),
+      session: toSession(apiResult),
       invalidation: null
     });
 
-    return { ok: true, role: user.role, source: "api" };
+    return { ok: true, role: apiResult.user.role, source: "api" };
+  },
+  register: async (phone, code, password) => {
+    const apiResult = await verifyRegisterOtp(phone || "+998", code, password);
+    if (!apiResult.ok) return apiResult;
+
+    set({
+      session: toSession(apiResult),
+      invalidation: null
+    });
+
+    return { ok: true, role: apiResult.user.role, source: "api" };
   },
   updateProfile: async (profile) => {
     const current = get().session;

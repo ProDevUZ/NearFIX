@@ -1,29 +1,44 @@
 import { Router } from "express";
 import {
-  otpRequestSchema,
-  otpVerifySchema,
-  phoneLoginSchema,
+  forgotPasswordOtpRequestSchema,
+  forgotPasswordOtpVerifySchema,
+  passwordLoginSchema,
   refreshTokenSchema,
+  registerOtpRequestSchema,
+  registerOtpVerifySchema,
   updateCurrentUserSchema
 } from "./auth.contracts.js";
 import { authenticate } from "./middleware/auth.middleware.js";
 import { otpRequestIpRateLimit } from "./middleware/otp-ip-rate-limit.js";
 import { deleteCurrentUserAccount } from "./account-deletion.service.js";
 import {
-  loginOrRegisterWithPhone,
+  loginWithPassword,
   refreshAccessToken,
-  requestOtp,
+  registerWithOtp,
+  requestForgotPasswordOtp,
+  requestRegistrationOtp,
+  resetPasswordWithOtp,
   revokeSession,
-  updateCurrentUserProfile,
-  verifyOtpAndCreateSession
+  updateCurrentUserProfile
 } from "./auth.service.js";
 
 export const authRouter = Router();
 
-authRouter.post("/phone", async (request, response, next) => {
+authRouter.post("/register/otp/request", otpRequestIpRateLimit, async (request, response, next) => {
   try {
-    const input = phoneLoginSchema.parse(request.body);
-    const result = await loginOrRegisterWithPhone(input);
+    const input = registerOtpRequestSchema.parse(request.body);
+    const result = await requestRegistrationOtp(input);
+
+    response.status(202).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/register/otp/verify", async (request, response, next) => {
+  try {
+    const input = registerOtpVerifySchema.parse(request.body);
+    const result = await registerWithOtp(input);
 
     response.status(201).json({
       ok: true,
@@ -37,30 +52,40 @@ authRouter.post("/phone", async (request, response, next) => {
   }
 });
 
-authRouter.post("/otp/request", otpRequestIpRateLimit, async (request, response, next) => {
+authRouter.post("/login", async (request, response, next) => {
   try {
-    const input = otpRequestSchema.parse(request.body);
-    const result = await requestOtp(input);
+    const input = passwordLoginSchema.parse(request.body);
+    const result = await loginWithPassword(input);
 
-    response.status(201).json(result);
-  } catch (error) {
-    next(error);
-  }
-});
-
-authRouter.post("/otp/verify", async (request, response, next) => {
-  try {
-    const input = otpVerifySchema.parse(request.body);
-    const result = await verifyOtpAndCreateSession(input);
-
-    response.status(201).json({
-      success: true,
+    response.json({
       ok: true,
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
       token: result.token,
       user: result.user
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/password/forgot/request", otpRequestIpRateLimit, async (request, response, next) => {
+  try {
+    const input = forgotPasswordOtpRequestSchema.parse(request.body);
+    const result = await requestForgotPasswordOtp(input);
+
+    response.status(202).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/password/forgot/verify", async (request, response, next) => {
+  try {
+    const input = forgotPasswordOtpVerifySchema.parse(request.body);
+    const result = await resetPasswordWithOtp(input);
+
+    response.json(result);
   } catch (error) {
     next(error);
   }

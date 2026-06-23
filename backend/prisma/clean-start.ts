@@ -31,6 +31,7 @@ async function main() {
       workerAvailability: await tx.workerAvailability.deleteMany(),
       workerProfiles: await tx.workerProfile.deleteMany(),
       sessions: await tx.session.deleteMany(),
+      otpChallenges: await tx.otpChallenge.deleteMany(),
       users: await tx.user.deleteMany()
     };
 

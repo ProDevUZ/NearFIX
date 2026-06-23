@@ -2,17 +2,25 @@ import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius, shadow } from "../../theme";
 
-export function PrimaryButton({ title, onPress, style }) {
+export function PrimaryButton({ title, onPress, style, disabled = false }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.primary, pressed && styles.pressed, style]}>
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.primary, disabled && styles.disabled, pressed && !disabled && styles.pressed, style]}
+    >
       <Text style={styles.primaryText}>{title}</Text>
     </Pressable>
   );
 }
 
-export function SecondaryButton({ title, onPress, style }) {
+export function SecondaryButton({ title, onPress, style, disabled = false }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.secondary, pressed && styles.pressed, style]}>
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.secondary, disabled && styles.disabled, pressed && !disabled && styles.pressed, style]}
+    >
       <Text style={styles.secondaryText}>{title}</Text>
     </Pressable>
   );
@@ -50,5 +58,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75
+  },
+  disabled: {
+    opacity: 0.55
   }
 });
