@@ -7,16 +7,19 @@ import { hashOtpCode } from "../src/modules/auth/otp.service.js";
 
 const phone = "+998991119911";
 const unknownPhone = "+998991119912";
+const aliasPhone = "+998991119913";
 const registerCode = "4312";
+const aliasRegisterCode = "9824";
 const resetCode = "7654";
 const oldPassword = "ApiPassword-123";
+const aliasPassword = "AliasPassword-123";
 const newPassword = "ApiPassword-456";
 
 async function cleanup() {
   const users = await prisma.user.findMany({
     where: {
       phone: {
-        in: [phone, unknownPhone]
+        in: [phone, unknownPhone, aliasPhone]
       }
     },
     select: { id: true }
@@ -32,14 +35,14 @@ async function cleanup() {
   await prisma.otpChallenge.deleteMany({
     where: {
       phone: {
-        in: [phone, unknownPhone]
+        in: [phone, unknownPhone, aliasPhone]
       }
     }
   });
   await prisma.user.deleteMany({
     where: {
       phone: {
-        in: [phone, unknownPhone]
+        in: [phone, unknownPhone, aliasPhone]
       }
     }
   });
@@ -65,6 +68,29 @@ async function main() {
   }
 
   try {
+    const aliasRegisterRequest = await post("/auth/otp/request", { phone: aliasPhone });
+    assert.equal(aliasRegisterRequest.response.status, 202);
+
+    await prisma.otpChallenge.updateMany({
+      where: {
+        phone: aliasPhone,
+        purpose: OtpPurpose.REGISTER,
+        consumedAt: null
+      },
+      data: {
+        codeHash: hashOtpCode(aliasPhone, aliasRegisterCode)
+      }
+    });
+
+    const aliasRegisterVerify = await post("/auth/otp/verify", {
+      phone: aliasPhone,
+      code: aliasRegisterCode,
+      password: aliasPassword
+    });
+    assert.equal(aliasRegisterVerify.response.status, 201);
+    assert.ok(aliasRegisterVerify.payload.accessToken);
+    assert.ok(aliasRegisterVerify.payload.refreshToken);
+
     const registerRequest = await post("/auth/register/otp/request", { phone });
     assert.equal(registerRequest.response.status, 202);
 
@@ -152,12 +178,6 @@ async function main() {
     });
     assert.equal(newPasswordLogin.response.status, 200);
     assert.ok(newPasswordLogin.payload.accessToken);
-
-    const removedOtpLogin = await post("/auth/otp/verify", {
-      phone,
-      code: resetCode
-    });
-    assert.equal(removedOtpLogin.response.status, 404);
 
     const removedLegacyPhoneLogin = await post("/auth/phone", {
       phone,

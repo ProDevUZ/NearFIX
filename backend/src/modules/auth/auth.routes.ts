@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import {
   forgotPasswordOtpRequestSchema,
   forgotPasswordOtpVerifySchema,
@@ -24,7 +24,7 @@ import {
 
 export const authRouter = Router();
 
-authRouter.post("/register/otp/request", otpRequestIpRateLimit, async (request, response, next) => {
+const requestRegistrationOtpHandler: RequestHandler = async (request, response, next) => {
   try {
     const input = registerOtpRequestSchema.parse(request.body);
     const result = await requestRegistrationOtp(input);
@@ -33,9 +33,9 @@ authRouter.post("/register/otp/request", otpRequestIpRateLimit, async (request, 
   } catch (error) {
     next(error);
   }
-});
+};
 
-authRouter.post("/register/otp/verify", async (request, response, next) => {
+const verifyRegistrationOtpHandler: RequestHandler = async (request, response, next) => {
   try {
     const input = registerOtpVerifySchema.parse(request.body);
     const result = await registerWithOtp(input);
@@ -50,7 +50,12 @@ authRouter.post("/register/otp/verify", async (request, response, next) => {
   } catch (error) {
     next(error);
   }
-});
+};
+
+authRouter.post("/otp/request", otpRequestIpRateLimit, requestRegistrationOtpHandler);
+authRouter.post("/register/otp/request", otpRequestIpRateLimit, requestRegistrationOtpHandler);
+authRouter.post("/otp/verify", verifyRegistrationOtpHandler);
+authRouter.post("/register/otp/verify", verifyRegistrationOtpHandler);
 
 authRouter.post("/login", async (request, response, next) => {
   try {
