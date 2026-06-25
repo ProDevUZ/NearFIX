@@ -1,6 +1,9 @@
 import type { AuthProvider, OtpDeliveryResult } from "./auth-provider.interface.js";
 
 const ESKIZ_SENDER = "4546";
+const FALLBACK_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
+const TOKEN_REFRESH_LEEWAY_MS = 60 * 1000;
+const MAX_LOG_BODY_LENGTH = 1000;
 
 type EskizAuthProviderOptions = {
   email: string;
@@ -8,27 +11,119 @@ type EskizAuthProviderOptions = {
   baseUrl: string;
   timeoutMs: number;
   fetchFn?: typeof fetch;
+  nowFn?: () => number;
 };
 
 type EskizLoginResponse = {
   data?: {
     token?: string;
+    expires_in?: number | string;
+    expiresIn?: number | string;
+    expires_at?: string;
+    expiresAt?: string;
   };
+  expires_in?: number | string;
+  expiresIn?: number | string;
+  expires_at?: string;
+  expiresAt?: string;
 };
 
 type EskizSendResponse = {
   id?: string;
 };
 
+type CachedToken = {
+  value: string;
+  expiresAt: number;
+};
+
+type SendAttemptResult = {
+  response: Response;
+  bodyText: string;
+};
+
+function safeNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+  return undefined;
+}
+
+function expiryFromPayload(payload: EskizLoginResponse, now: number) {
+  const expiresIn =
+    safeNumber(payload.data?.expires_in) ??
+    safeNumber(payload.data?.expiresIn) ??
+    safeNumber(payload.expires_in) ??
+    safeNumber(payload.expiresIn);
+
+  if (expiresIn && expiresIn > 0) {
+    return Math.min(now + expiresIn * 1000, now + FALLBACK_TOKEN_TTL_MS);
+  }
+
+  const expiresAtText = payload.data?.expires_at ?? payload.data?.expiresAt ?? payload.expires_at ?? payload.expiresAt;
+  if (expiresAtText) {
+    const expiresAt = Date.parse(expiresAtText);
+    if (Number.isFinite(expiresAt) && expiresAt > now) {
+      return Math.min(expiresAt, now + FALLBACK_TOKEN_TTL_MS);
+    }
+  }
+
+  return now + FALLBACK_TOKEN_TTL_MS;
+}
+
+function sanitizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => {
+        const normalizedKey = key.toLowerCase();
+        if (
+          normalizedKey.includes("token") ||
+          normalizedKey.includes("password") ||
+          normalizedKey.includes("secret") ||
+          normalizedKey.includes("authorization")
+        ) {
+          return [key, "[redacted]"];
+        }
+
+        return [key, sanitizeValue(nestedValue)];
+      })
+    );
+  }
+
+  return value;
+}
+
+function sanitizeResponseBody(bodyText: string) {
+  if (!bodyText.trim()) return "";
+
+  try {
+    return JSON.stringify(sanitizeValue(JSON.parse(bodyText))).slice(0, MAX_LOG_BODY_LENGTH);
+  } catch {
+    return bodyText.slice(0, MAX_LOG_BODY_LENGTH);
+  }
+}
+
+function isAuthFailure(status: number) {
+  return status === 401 || status === 403;
+}
+
 export class EskizAuthProvider implements AuthProvider {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
-  private token?: string;
-  private tokenRequest?: Promise<string>;
+  private readonly nowFn: () => number;
+  private token?: CachedToken;
+  private tokenRequest?: Promise<CachedToken>;
 
   constructor(private readonly options: EskizAuthProviderOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.fetchFn = options.fetchFn ?? fetch;
+    this.nowFn = options.nowFn ?? Date.now;
   }
 
   private async login() {
@@ -43,6 +138,10 @@ export class EskizAuthProvider implements AuthProvider {
     });
 
     if (!response.ok) {
+      const bodyText = await response.text().catch(() => "");
+      console.error(
+        `[eskiz] login failed status=${response.status} body=${sanitizeResponseBody(bodyText)}`
+      );
       throw new Error(`Eskiz login failed with status ${response.status}`);
     }
 
@@ -53,13 +152,30 @@ export class EskizAuthProvider implements AuthProvider {
       throw new Error("Eskiz login response does not contain a token");
     }
 
-    this.token = token;
-    return token;
+    const cachedToken = {
+      value: token,
+      expiresAt: expiryFromPayload(payload, this.nowFn())
+    };
+
+    this.token = cachedToken;
+    return cachedToken;
   }
 
-  private async getToken() {
-    if (this.token) {
+  private isTokenValid(token: CachedToken) {
+    return token.expiresAt - TOKEN_REFRESH_LEEWAY_MS > this.nowFn();
+  }
+
+  private clearToken() {
+    this.token = undefined;
+  }
+
+  private async getToken(forceRefresh = false) {
+    if (!forceRefresh && this.token && this.isTokenValid(this.token)) {
       return this.token;
+    }
+
+    if (forceRefresh) {
+      this.clearToken();
     }
 
     if (!this.tokenRequest) {
@@ -71,12 +187,7 @@ export class EskizAuthProvider implements AuthProvider {
     return this.tokenRequest;
   }
 
-  async sendOtp(phone: string, code?: string): Promise<OtpDeliveryResult> {
-    if (!code) {
-      throw new Error("OTP code is required for Eskiz SMS delivery");
-    }
-
-    const token = await this.getToken();
+  private async sendSms(phone: string, code: string, token: CachedToken): Promise<SendAttemptResult> {
     const body = new FormData();
     body.set("mobile_phone", phone.replace(/\D/g, ""));
     body.set("message", `NearFIX ilovasiga kirish uchun tasdiqlash kodi: ${code}. Kodni hech kimga bermang.`);
@@ -86,17 +197,56 @@ export class EskizAuthProvider implements AuthProvider {
     const response = await this.fetchFn(`${this.baseUrl}/api/message/sms/send`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token.value}`
       },
       body,
       signal: AbortSignal.timeout(this.options.timeoutMs)
     });
 
-    if (!response.ok) {
-      throw new Error(`Eskiz SMS send failed with status ${response.status}`);
+    return {
+      response,
+      bodyText: await response.text().catch(() => "")
+    };
+  }
+
+  private logSendFailure(status: number, bodyText: string) {
+    const message =
+      status === 429
+        ? "send rate-limited"
+        : isAuthFailure(status)
+          ? "send auth failed"
+          : "send failed";
+
+    console.error(`[eskiz] ${message} status=${status} body=${sanitizeResponseBody(bodyText)}`);
+  }
+
+  private parseSendPayload(bodyText: string): EskizSendResponse {
+    if (!bodyText.trim()) return {};
+
+    return JSON.parse(bodyText) as EskizSendResponse;
+  }
+
+  async sendOtp(phone: string, code?: string): Promise<OtpDeliveryResult> {
+    if (!code) {
+      throw new Error("OTP code is required for Eskiz SMS delivery");
     }
 
-    const payload = (await response.json()) as EskizSendResponse;
+    let token = await this.getToken();
+    let attempt = await this.sendSms(phone, code, token);
+
+    if (!attempt.response.ok && isAuthFailure(attempt.response.status)) {
+      this.logSendFailure(attempt.response.status, attempt.bodyText);
+      this.clearToken();
+      token = await this.getToken(true);
+      attempt = await this.sendSms(phone, code, token);
+    }
+
+    if (!attempt.response.ok) {
+      this.logSendFailure(attempt.response.status, attempt.bodyText);
+      throw new Error(`Eskiz SMS send failed with status ${attempt.response.status}`);
+    }
+
+    const payload = this.parseSendPayload(attempt.bodyText);
 
     return {
       providerMessageId: payload.id
