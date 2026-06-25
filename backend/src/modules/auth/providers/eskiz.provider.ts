@@ -113,6 +113,21 @@ function isAuthFailure(status: number) {
   return status === 401 || status === 403;
 }
 
+function isTokenExpiredResponse(bodyText: string) {
+  if (!bodyText.trim()) return false;
+
+  try {
+    const payload = sanitizeValue(JSON.parse(bodyText));
+    return JSON.stringify(payload).toLowerCase().includes("token has expired");
+  } catch {
+    return bodyText.toLowerCase().includes("token has expired");
+  }
+}
+
+function shouldRefreshTokenAfterSend(status: number, bodyText: string) {
+  return isAuthFailure(status) || isTokenExpiredResponse(bodyText);
+}
+
 export class EskizAuthProvider implements AuthProvider {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
@@ -213,7 +228,7 @@ export class EskizAuthProvider implements AuthProvider {
     const message =
       status === 429
         ? "send rate-limited"
-        : isAuthFailure(status)
+        : shouldRefreshTokenAfterSend(status, bodyText)
           ? "send auth failed"
           : "send failed";
 
@@ -234,7 +249,7 @@ export class EskizAuthProvider implements AuthProvider {
     let token = await this.getToken();
     let attempt = await this.sendSms(phone, code, token);
 
-    if (!attempt.response.ok && isAuthFailure(attempt.response.status)) {
+    if (!attempt.response.ok && shouldRefreshTokenAfterSend(attempt.response.status, attempt.bodyText)) {
       this.logSendFailure(attempt.response.status, attempt.bodyText);
       this.clearToken();
       token = await this.getToken(true);

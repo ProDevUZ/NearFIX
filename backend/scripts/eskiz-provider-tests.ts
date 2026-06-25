@@ -113,6 +113,22 @@ async function testAuthFailureRefreshesTokenAndRetriesOnce() {
   assert.deepEqual(authHeaders(mock.calls), ["Bearer token-a", "Bearer token-b"]);
 }
 
+async function testTokenExpiredBodyRefreshesTokenAndRetriesOnce() {
+  const mock = createMockFetch([
+    jsonResponse(200, { data: { token: "token-a" } }),
+    jsonResponse(500, { message: "Token has expired", status_code: 500 }),
+    jsonResponse(200, { data: { token: "token-b" } }),
+    jsonResponse(200, { id: "sms-2" })
+  ]);
+  const provider = createProvider(mock.fetchFn, () => 1_000_000);
+
+  await provider.sendOtp("+998901112233", "1234");
+
+  assert.equal(countCalls(mock.calls, "/api/auth/login"), 2);
+  assert.equal(countCalls(mock.calls, "/api/message/sms/send"), 2);
+  assert.deepEqual(authHeaders(mock.calls), ["Bearer token-a", "Bearer token-b"]);
+}
+
 async function testRetryFailureReturnsProviderFailure() {
   const mock = createMockFetch([
     jsonResponse(200, { data: { token: "token-a" } }),
@@ -145,12 +161,25 @@ async function testNonAuthFailuresDoNotRetryToken() {
   assert.equal(countCalls(badRequest.calls, "/api/message/sms/send"), 1);
 }
 
+async function testGenericServerFailureDoesNotRetryToken() {
+  const mock = createMockFetch([
+    jsonResponse(200, { data: { token: "token-a" } }),
+    jsonResponse(500, { message: "Provider unavailable" })
+  ]);
+
+  await assertRejectsMessage(createProvider(mock.fetchFn, () => 1_000_000).sendOtp("+998901112233", "1234"), "status 500");
+  assert.equal(countCalls(mock.calls, "/api/auth/login"), 1);
+  assert.equal(countCalls(mock.calls, "/api/message/sms/send"), 1);
+}
+
 async function main() {
   await testTokenReusedWhileValid();
   await testExpiredTokenTriggersLogin();
   await testAuthFailureRefreshesTokenAndRetriesOnce();
+  await testTokenExpiredBodyRefreshesTokenAndRetriesOnce();
   await testRetryFailureReturnsProviderFailure();
   await testNonAuthFailuresDoNotRetryToken();
+  await testGenericServerFailureDoesNotRetryToken();
 
   console.log("Eskiz provider tests passed");
 }
