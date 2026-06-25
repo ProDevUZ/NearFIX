@@ -1,6 +1,6 @@
 import type { AuthProvider, OtpDeliveryResult } from "./auth-provider.interface.js";
 
-const ESKIZ_SENDER = "4546";
+const DEFAULT_ESKIZ_SENDER = "4546";
 const FALLBACK_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 const TOKEN_REFRESH_LEEWAY_MS = 60 * 1000;
 const MAX_LOG_BODY_LENGTH = 1000;
@@ -10,6 +10,7 @@ type EskizAuthProviderOptions = {
   password: string;
   baseUrl: string;
   timeoutMs: number;
+  sender?: string;
   fetchFn?: typeof fetch;
   nowFn?: () => number;
 };
@@ -109,6 +110,14 @@ function sanitizeResponseBody(bodyText: string) {
   }
 }
 
+function errorForLog(error: unknown) {
+  if (error instanceof Error) {
+    return `${error.name}: ${sanitizeResponseBody(error.message)}`;
+  }
+
+  return sanitizeResponseBody(String(error));
+}
+
 function isAuthFailure(status: number) {
   return status === 401 || status === 403;
 }
@@ -132,6 +141,7 @@ export class EskizAuthProvider implements AuthProvider {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
   private readonly nowFn: () => number;
+  private readonly sender: string;
   private token?: CachedToken;
   private tokenRequest?: Promise<CachedToken>;
 
@@ -139,6 +149,7 @@ export class EskizAuthProvider implements AuthProvider {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.fetchFn = options.fetchFn ?? fetch;
     this.nowFn = options.nowFn ?? Date.now;
+    this.sender = options.sender || DEFAULT_ESKIZ_SENDER;
   }
 
   private async login() {
@@ -150,20 +161,32 @@ export class EskizAuthProvider implements AuthProvider {
       method: "POST",
       body,
       signal: AbortSignal.timeout(this.options.timeoutMs)
+    }).catch((error) => {
+      console.error(`[eskiz] login request failed error=${errorForLog(error)}`);
+      throw error;
     });
 
+    const bodyText = await response.text().catch(() => "");
+
     if (!response.ok) {
-      const bodyText = await response.text().catch(() => "");
       console.error(
         `[eskiz] login failed status=${response.status} body=${sanitizeResponseBody(bodyText)}`
       );
       throw new Error(`Eskiz login failed with status ${response.status}`);
     }
 
-    const payload = (await response.json()) as EskizLoginResponse;
+    let payload: EskizLoginResponse;
+    try {
+      payload = JSON.parse(bodyText) as EskizLoginResponse;
+    } catch (error) {
+      console.error(`[eskiz] login response parse failed body=${sanitizeResponseBody(bodyText)} error=${errorForLog(error)}`);
+      throw error;
+    }
+
     const token = payload.data?.token;
 
     if (!token) {
+      console.error(`[eskiz] login response missing token body=${sanitizeResponseBody(bodyText)}`);
       throw new Error("Eskiz login response does not contain a token");
     }
 
@@ -206,7 +229,7 @@ export class EskizAuthProvider implements AuthProvider {
     const body = new FormData();
     body.set("mobile_phone", phone.replace(/\D/g, ""));
     body.set("message", `NearFIX ilovasiga kirish uchun tasdiqlash kodi: ${code}. Kodni hech kimga bermang.`);
-    body.set("from", ESKIZ_SENDER);
+    body.set("from", this.sender);
     body.set("callback_url", "");
 
     const response = await this.fetchFn(`${this.baseUrl}/api/message/sms/send`, {
@@ -216,6 +239,9 @@ export class EskizAuthProvider implements AuthProvider {
       },
       body,
       signal: AbortSignal.timeout(this.options.timeoutMs)
+    }).catch((error) => {
+      console.error(`[eskiz] send request failed error=${errorForLog(error)}`);
+      throw error;
     });
 
     return {

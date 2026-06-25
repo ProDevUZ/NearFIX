@@ -16,6 +16,7 @@ export function createAuthProvider(provider = env.OTP_PROVIDER): AuthProvider {
     email: env.ESKIZ_EMAIL,
     password: env.ESKIZ_PASSWORD,
     baseUrl: env.ESKIZ_BASE_URL,
-    timeoutMs: env.ESKIZ_TIMEOUT_MS
+    timeoutMs: env.ESKIZ_TIMEOUT_MS,
+    sender: env.ESKIZ_SENDER
   });
 }
