@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { adminLoginRateLimit } from "./admin-login-rate-limit.js";
 import { writeAdminAuditLog } from "./admin-audit.service.js";
-import { adminLoginSchema } from "./admin-auth.contracts.js";
+import { adminChangePasswordSchema, adminLoginSchema } from "./admin-auth.contracts.js";
 import { authenticateEnvAdmin } from "./admin-auth.middleware.js";
-import { loginAdmin, resolveAdminLoginAuditActor } from "./admin-auth.service.js";
+import { changeAdminPassword, loginAdmin, resolveAdminLoginAuditActor } from "./admin-auth.service.js";
 
 export const adminAuthRouter = Router();
 
@@ -51,4 +51,25 @@ adminAuthRouter.get("/me", authenticateEnvAdmin, (request, response) => {
     ok: true,
     user: request.user
   });
+});
+
+adminAuthRouter.post("/change-password", authenticateEnvAdmin, async (request, response, next) => {
+  try {
+    const input = adminChangePasswordSchema.parse(request.body);
+    await changeAdminPassword(request.admin!, input);
+    await writeAdminAuditLog({
+      actorType: "ADMIN_ACCOUNT",
+      actorAdminId: request.admin!.id,
+      action: "admin.password_changed",
+      targetType: "AdminAccount",
+      targetId: request.admin!.id,
+      metadata: { username: request.admin!.username },
+      ipAddress: request.ip,
+      userAgent: request.get("user-agent") || null
+    });
+
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
 });

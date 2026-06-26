@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,13 +11,22 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const login = useAdminSessionStore((state) => state.login);
 
+  useEffect(() => {
+    const flash = window.localStorage.getItem("nearfix-admin-flash");
+    if (!flash) return;
+    window.localStorage.removeItem("nearfix-admin-flash");
+    setMessage(flash);
+  }, []);
+
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setMessage("");
     setIsSubmitting(true);
     const result = await login(username, password);
     setIsSubmitting(false);
@@ -49,6 +58,7 @@ export default function LoginPage() {
               type="password"
               value={password}
             />
+            {message ? <p className="text-sm font-medium text-green-700">{message}</p> : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <Button className="w-full" disabled={isSubmitting || !username || !password} type="submit">
               {isSubmitting ? "Kirilmoqda..." : "Kirish"}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Flag, Images, LayoutDashboard, LifeBuoy, Shield, Star, Users, Wrench } from "lucide-react";
+import { ClipboardList, Flag, History, Images, LayoutDashboard, LifeBuoy, Shield, Star, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, isSuperAdmin, type AdminPermission } from "@/shared/auth/permissions";
 import { useAdminSessionStore } from "@/stores/admin-session-store";
@@ -32,7 +32,8 @@ const contentNavItems = [
 }[];
 
 const systemNavItems = [
-  { href: "/system/admins", label: "Admins", icon: Shield, permissions: ["admins.read", "admins.manage"] }
+  { href: "/system/admins", label: "Admins", icon: Shield, permissions: ["admins.read", "admins.manage"] },
+  { href: "/system/audit-logs", label: "Audit Logs", icon: History, permissions: ["audit.read"] }
 ] satisfies {
   href: string;
   label: string;

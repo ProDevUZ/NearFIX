@@ -17,9 +17,10 @@ export const authenticateEnvAdmin: RequestHandler = async (request, _response, n
     request.accessToken = token;
     request.admin = admin;
     request.user = admin;
+
     next();
   } catch (error) {
-    if (typeof error === "object" && error && "status" in error && error.status === 401) {
+    if (typeof error === "object" && error && "status" in error && (error.status === 401 || error.status === 403)) {
       next(error);
       return;
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAdminSessionStore } from "@/stores/admin-session-store";
@@ -27,6 +28,14 @@ export function Topbar() {
         <button className="flex h-10 w-10 items-center justify-center rounded-md border bg-card text-muted-foreground">
           <Bell className="h-4 w-4" />
         </button>
+        {session?.tokenType === "admin_account" ? (
+          <Link
+            className="rounded-md border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            href="/change-password"
+          >
+            Change password
+          </Link>
+        ) : null}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
             {initials}

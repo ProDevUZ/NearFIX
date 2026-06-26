@@ -16,6 +16,7 @@ export const ADMIN_PERMISSIONS = [
   "content.manage",
   "notifications.read",
   "notifications.manage",
+  "audit.read",
   "admins.read",
   "admins.manage",
   "super_admin.manage"

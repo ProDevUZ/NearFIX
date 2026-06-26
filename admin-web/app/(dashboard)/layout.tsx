@@ -21,7 +21,8 @@ const routePermissions: {
   { prefix: "/reports", permission: "reports.read" },
   { prefix: "/support", permission: "support.read" },
   { prefix: "/content", permission: "content.read" },
-  { prefix: "/system/admins", anyPermission: ["admins.read", "admins.manage"] }
+  { prefix: "/system/admins", anyPermission: ["admins.read", "admins.manage"] },
+  { prefix: "/system/audit-logs", permission: "audit.read" }
 ];
 
 function canAccessPath(session: { role: string; permissions: string[] }, pathname: string) {

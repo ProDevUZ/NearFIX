@@ -1,5 +1,5 @@
-import { Router } from "express";
-import { OrderStatus, ReviewStatus, UserStatus, type Prisma } from "@prisma/client";
+import { Router, type Request } from "express";
+import { OrderStatus, ReportStatus, ReviewStatus, UserStatus, type Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requirePermission } from "../auth/middleware/permission.guard.js";
@@ -21,6 +21,7 @@ import {
   updateAdminSupportTicket
 } from "../support/support.service.js";
 import { setReviewVisibility } from "../reviews/review.service.js";
+import { listAdminAuditLogs, writeAdminAuditLog } from "../admin-auth/admin-audit.service.js";
 
 export const adminRouter = Router();
 
@@ -67,6 +68,38 @@ function mapOrderStatusFilter(status?: string): Prisma.EnumOrderStatusFilter | u
   }
 
   return undefined;
+}
+
+async function auditAdminAction(
+  request: Request,
+  input: {
+    action: string;
+    targetType: string;
+    targetId: string;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  if (!request.admin) return;
+
+  await writeAdminAuditLog({
+    actorType: request.admin.actorType,
+    actorAdminId: request.admin.actorType === "ADMIN_ACCOUNT" ? request.admin.id : null,
+    action: input.action,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    metadata: {
+      actorUsername: request.admin.username,
+      ...input.metadata
+    },
+    ipAddress: request.ip,
+    userAgent: request.get("user-agent") || null
+  });
+}
+
+function reportAuditAction(status: ReportStatus) {
+  if (status === ReportStatus.DISMISSED) return "report.rejected";
+  if (status === ReportStatus.RESOLVED || status === ReportStatus.ACTION_TAKEN) return "report.resolved";
+  return "report.status_updated";
 }
 
 function buildAdminOrdersWhere(query: Record<string, unknown>): Prisma.OrderWhereInput {
@@ -125,6 +158,29 @@ adminRouter.get("/dashboard", requirePermission("analytics.read"), async (reques
         cityOverview: []
       }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.get("/audit-logs", requirePermission("audit.read"), async (request, response, next) => {
+  try {
+    const result = await listAdminAuditLogs({
+      action: readQueryValue(request.query.action),
+      actorAdminId: readQueryValue(request.query.actorAdminId),
+      actorType:
+        readQueryValue(request.query.actorType) === "ENV_ADMIN" || readQueryValue(request.query.actorType) === "ADMIN_ACCOUNT"
+          ? readQueryValue(request.query.actorType) as "ENV_ADMIN" | "ADMIN_ACCOUNT"
+          : undefined,
+      targetType: readQueryValue(request.query.targetType),
+      targetId: readQueryValue(request.query.targetId),
+      from: readQueryValue(request.query.from),
+      to: readQueryValue(request.query.to),
+      page: readQueryValue(request.query.page),
+      limit: readQueryValue(request.query.limit)
+    });
+
+    response.json({ ok: true, ...result });
   } catch (error) {
     next(error);
   }
@@ -200,7 +256,14 @@ adminRouter.get("/reviews", requirePermission("reviews.read"), async (request, r
 
 adminRouter.patch("/reviews/:reviewId/hide", requirePermission("reviews.manage"), async (request, response, next) => {
   try {
-    const review = await setReviewVisibility(String(request.params.reviewId), ReviewStatus.HIDDEN);
+    const reviewId = String(request.params.reviewId);
+    const review = await setReviewVisibility(reviewId, ReviewStatus.HIDDEN);
+    await auditAdminAction(request, {
+      action: "review.hidden",
+      targetType: "Review",
+      targetId: reviewId,
+      metadata: { status: ReviewStatus.HIDDEN }
+    });
     response.json({ ok: true, review });
   } catch (error) {
     next(error);
@@ -209,7 +272,14 @@ adminRouter.patch("/reviews/:reviewId/hide", requirePermission("reviews.manage")
 
 adminRouter.patch("/reviews/:reviewId/restore", requirePermission("reviews.manage"), async (request, response, next) => {
   try {
-    const review = await setReviewVisibility(String(request.params.reviewId), ReviewStatus.PUBLISHED);
+    const reviewId = String(request.params.reviewId);
+    const review = await setReviewVisibility(reviewId, ReviewStatus.PUBLISHED);
+    await auditAdminAction(request, {
+      action: "review.restored",
+      targetType: "Review",
+      targetId: reviewId,
+      metadata: { status: ReviewStatus.PUBLISHED }
+    });
     response.json({ ok: true, review });
   } catch (error) {
     next(error);
@@ -235,7 +305,14 @@ adminRouter.get("/reports/:reportId", requirePermission("reports.read"), async (
 adminRouter.patch("/reports/:reportId/status", requirePermission("reports.manage"), async (request, response, next) => {
   try {
     const input = updateReportStatusSchema.parse(request.body);
-    const report = await updateAdminReport(String(request.params.reportId), request.user!.id, input);
+    const reportId = String(request.params.reportId);
+    const report = await updateAdminReport(reportId, request.user!.id, input);
+    await auditAdminAction(request, {
+      action: reportAuditAction(input.status),
+      targetType: "Report",
+      targetId: reportId,
+      metadata: { status: input.status, hasAdminNote: Boolean(input.adminNote?.trim()) }
+    });
     response.json({ ok: true, report });
   } catch (error) {
     next(error);
@@ -261,7 +338,22 @@ adminRouter.get("/support/tickets/:ticketId", requirePermission("support.read"),
 adminRouter.patch("/support/tickets/:ticketId", requirePermission("support.manage"), async (request, response, next) => {
   try {
     const input = updateSupportTicketSchema.parse(request.body);
-    const ticket = await updateAdminSupportTicket(String(request.params.ticketId), request.user!.id, input);
+    const ticketId = String(request.params.ticketId);
+    const ticket = await updateAdminSupportTicket(ticketId, request.user!.id, input);
+    await auditAdminAction(request, {
+      action: "support.status_updated",
+      targetType: "SupportTicket",
+      targetId: ticketId,
+      metadata: { status: input.status }
+    });
+    if (input.adminNote !== undefined) {
+      await auditAdminAction(request, {
+        action: "support.note_updated",
+        targetType: "SupportTicket",
+        targetId: ticketId,
+        metadata: { hasAdminNote: Boolean(input.adminNote?.trim()) }
+      });
+    }
     response.json({ ok: true, ticket });
   } catch (error) {
     next(error);
@@ -328,7 +420,14 @@ adminRouter.post("/users/:userId/promote-provider", requirePermission("users.man
 adminRouter.post("/workers/:workerId/approve", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = approveWorkerSchema.parse(request.body);
-    const worker = await approveWorkerProfile(String(request.params.workerId), input);
+    const workerId = String(request.params.workerId);
+    const worker = await approveWorkerProfile(workerId, input);
+    await auditAdminAction(request, {
+      action: "worker.approved",
+      targetType: "WorkerProfile",
+      targetId: workerId,
+      metadata: { profession: input.profession, professions: input.professions }
+    });
 
     response.json({
       ok: true,
@@ -343,7 +442,14 @@ adminRouter.post("/workers/:workerId/approve", requirePermission("workers.manage
 adminRouter.post("/workers/:workerId/reject", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await rejectWorkerProfile(String(request.params.workerId), input.reason);
+    const workerId = String(request.params.workerId);
+    const worker = await rejectWorkerProfile(workerId, input.reason);
+    await auditAdminAction(request, {
+      action: "worker.rejected",
+      targetType: "WorkerProfile",
+      targetId: workerId,
+      metadata: { hasReason: Boolean(input.reason?.trim()) }
+    });
 
     response.json({
       ok: true,
@@ -358,7 +464,14 @@ adminRouter.post("/workers/:workerId/reject", requirePermission("workers.manage"
 adminRouter.post("/workers/:workerId/suspend", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await suspendWorkerProfile(String(request.params.workerId), input.reason);
+    const workerId = String(request.params.workerId);
+    const worker = await suspendWorkerProfile(workerId, input.reason);
+    await auditAdminAction(request, {
+      action: "worker.suspended",
+      targetType: "WorkerProfile",
+      targetId: workerId,
+      metadata: { hasReason: Boolean(input.reason?.trim()) }
+    });
 
     response.json({
       ok: true,
@@ -373,7 +486,14 @@ adminRouter.post("/workers/:workerId/suspend", requirePermission("workers.manage
 adminRouter.post("/workers/:workerId/unsuspend", requirePermission("workers.manage"), async (request, response, next) => {
   try {
     const input = workerModerationSchema.parse(request.body);
-    const worker = await unsuspendWorkerProfile(String(request.params.workerId), input.reason);
+    const workerId = String(request.params.workerId);
+    const worker = await unsuspendWorkerProfile(workerId, input.reason);
+    await auditAdminAction(request, {
+      action: "worker.unsuspended",
+      targetType: "WorkerProfile",
+      targetId: workerId,
+      metadata: { hasReason: Boolean(input.reason?.trim()) }
+    });
 
     response.json({
       ok: true,

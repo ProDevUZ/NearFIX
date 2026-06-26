@@ -2,6 +2,7 @@ import { Router, type Request } from "express";
 import multer from "multer";
 import { env } from "../../config/env.js";
 import { createR2ObjectKey, uploadObjectToR2 } from "../../storage/r2.storage.js";
+import { writeAdminAuditLog } from "../admin-auth/admin-audit.service.js";
 import { authenticate } from "../auth/middleware/auth.middleware.js";
 import { requirePermission } from "../auth/middleware/permission.guard.js";
 import { requireRole } from "../auth/middleware/role.guard.js";
@@ -65,6 +66,27 @@ function toPublicBanner(request: Request, banner: { imageUrl: string }) {
   };
 }
 
+async function auditBannerAction(
+  request: Request,
+  input: { action: string; targetId: string; metadata?: Record<string, unknown> }
+) {
+  if (!request.admin) return;
+
+  await writeAdminAuditLog({
+    actorType: request.admin.actorType,
+    actorAdminId: request.admin.actorType === "ADMIN_ACCOUNT" ? request.admin.id : null,
+    action: input.action,
+    targetType: "Banner",
+    targetId: input.targetId,
+    metadata: {
+      actorUsername: request.admin.username,
+      ...input.metadata
+    },
+    ipAddress: request.ip,
+    userAgent: request.get("user-agent") || null
+  });
+}
+
 adminBannerRouter.use(authenticate, requireRole("ADMIN"));
 
 adminBannerRouter.get("/", requirePermission("content.read"), async (request, response, next) => {
@@ -80,6 +102,11 @@ adminBannerRouter.post("/", requirePermission("content.manage"), async (request,
   try {
     const input = createBannerSchema.parse(request.body);
     const banner = await createBanner(input);
+    await auditBannerAction(request, {
+      action: "banner.created",
+      targetId: banner.id,
+      metadata: { title: banner.title, targetType: banner.targetType, isActive: banner.isActive }
+    });
     response.status(201).json({ ok: true, banner: toPublicBanner(request, banner) });
   } catch (error) {
     next(error);
@@ -128,7 +155,13 @@ adminBannerRouter.patch("/reorder", requirePermission("content.manage"), async (
 adminBannerRouter.patch("/:bannerId", requirePermission("content.manage"), async (request, response, next) => {
   try {
     const input = updateBannerSchema.parse(request.body);
-    const banner = await updateBanner(String(request.params.bannerId), input);
+    const bannerId = String(request.params.bannerId);
+    const banner = await updateBanner(bannerId, input);
+    await auditBannerAction(request, {
+      action: "banner.updated",
+      targetId: bannerId,
+      metadata: { changedFields: Object.keys(input) }
+    });
     response.json({ ok: true, banner: toPublicBanner(request, banner) });
   } catch (error) {
     next(error);
@@ -137,7 +170,12 @@ adminBannerRouter.patch("/:bannerId", requirePermission("content.manage"), async
 
 adminBannerRouter.delete("/:bannerId", requirePermission("content.manage"), async (request, response, next) => {
   try {
-    await deleteBanner(String(request.params.bannerId));
+    const bannerId = String(request.params.bannerId);
+    await deleteBanner(bannerId);
+    await auditBannerAction(request, {
+      action: "banner.deleted",
+      targetId: bannerId
+    });
     response.json({ ok: true });
   } catch (error) {
     next(error);

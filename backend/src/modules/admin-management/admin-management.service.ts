@@ -255,7 +255,7 @@ export async function createAdmin(actor: AdminContext, input: CreateAdminInput, 
         name: input.name?.trim() || null,
         role,
         status: AdminAccountStatus.ACTIVE,
-        mustChangePassword: input.mustChangePassword ?? true,
+        mustChangePassword: input.mustChangePassword ?? false,
         passwordChangedAt: new Date(),
         permissions: {
           create: permissions.map((permission) => ({ permission }))
@@ -349,7 +349,7 @@ export async function resetAdminPassword(actor: AdminContext, adminId: string, i
     data: {
       passwordHash,
       passwordChangedAt: new Date(),
-      mustChangePassword: input.mustChangePassword ?? true,
+      mustChangePassword: input.mustChangePassword ?? false,
       sessionVersion: { increment: 1 }
     },
     include: { permissions: true }

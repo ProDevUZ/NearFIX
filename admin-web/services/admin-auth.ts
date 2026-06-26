@@ -28,3 +28,11 @@ export async function fetchAdminMe(token: string) {
     token
   });
 }
+
+export async function changeAdminPassword(token: string, input: { currentPassword: string; newPassword: string }) {
+  return apiClient<{ ok: true }>("/admin/auth/change-password", {
+    method: "POST",
+    token,
+    body: JSON.stringify(input)
+  });
+}

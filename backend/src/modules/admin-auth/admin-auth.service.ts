@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { AdminAccountRole, AdminAccountStatus, type AdminAccount } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
-import { verifyPassword } from "../auth/password.js";
+import { hashPassword, isPasswordWithinBcryptLimit, verifyPassword } from "../auth/password.js";
 import { ADMIN_PERMISSIONS, type AdminPermission } from "../auth/permissions.js";
 
 const ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60;
@@ -80,6 +80,26 @@ function disabled() {
     status: 403,
     code: "ADMIN_DISABLED"
   });
+}
+
+function assertStrongAdminPassword(username: string, password: string) {
+  const normalizedPassword = password.toLowerCase();
+  const normalizedUsername = username.toLowerCase();
+  const trivialPasswords = new Set(["admin321", "password", "password123", "12345678", "1234567890", "qwerty123"]);
+
+  if (password.length < 10 || !isPasswordWithinBcryptLimit(password)) {
+    throw Object.assign(new Error("Admin password does not meet security requirements"), {
+      status: 400,
+      code: "INVALID_ADMIN_PASSWORD"
+    });
+  }
+
+  if (trivialPasswords.has(normalizedPassword) || normalizedPassword.includes(normalizedUsername)) {
+    throw Object.assign(new Error("Admin password is too easy to guess"), {
+      status: 400,
+      code: "INVALID_ADMIN_PASSWORD"
+    });
+  }
 }
 
 function roleToApi(role: AdminAccountRole): "admin" | "super_admin" {
@@ -262,6 +282,47 @@ export async function loginAdmin(input: { username: string; password: string }) 
     expiresIn: ADMIN_TOKEN_TTL_SECONDS,
     user: createDbAdminUser(updatedAdmin)
   };
+}
+
+export async function changeAdminPassword(
+  actor: AdminContext,
+  input: { currentPassword: string; newPassword: string }
+) {
+  if (actor.tokenType !== DB_ADMIN_TOKEN_TYPE || !actor.adminId) {
+    throw Object.assign(new Error("Env admin password is managed outside the app"), {
+      status: 403,
+      code: "ADMIN_ACCOUNT_REQUIRED"
+    });
+  }
+
+  const admin = await prisma.adminAccount.findUnique({
+    where: { id: actor.adminId },
+    select: { id: true, username: true, passwordHash: true, status: true }
+  });
+
+  if (!admin) throw unauthorized("Admin account no longer exists");
+  if (admin.status === AdminAccountStatus.DISABLED) throw disabled();
+
+  const currentPasswordMatches = await verifyPassword(input.currentPassword, admin.passwordHash);
+  if (!currentPasswordMatches) {
+    throw Object.assign(new Error("Current password is invalid"), {
+      status: 400,
+      code: "INVALID_CURRENT_PASSWORD"
+    });
+  }
+
+  assertStrongAdminPassword(admin.username, input.newPassword);
+
+  const passwordHash = await hashPassword(input.newPassword);
+  await prisma.adminAccount.update({
+    where: { id: admin.id },
+    data: {
+      passwordHash,
+      passwordChangedAt: new Date(),
+      mustChangePassword: false,
+      sessionVersion: { increment: 1 }
+    }
+  });
 }
 
 export async function resolveAdminLoginAuditActor(username: string): Promise<{
