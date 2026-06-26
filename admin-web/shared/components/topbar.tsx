@@ -2,11 +2,14 @@
 
 import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useAdminSessionStore } from "@/stores/admin-session-store";
 import { useAdminUiStore } from "@/stores/ui-store";
 
 export function Topbar() {
   const globalSearch = useAdminUiStore((state) => state.globalSearch);
   const setGlobalSearch = useAdminUiStore((state) => state.setGlobalSearch);
+  const session = useAdminSessionStore((state) => state.session);
+  const initials = (session?.name || session?.username || "NF").slice(0, 2).toUpperCase();
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/95 px-8 backdrop-blur">
@@ -26,11 +29,11 @@ export function Topbar() {
         </button>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-            NF
+            {initials}
           </div>
           <div>
-            <div className="text-sm font-medium">Operations Admin</div>
-            <div className="text-xs text-muted-foreground">Monitoring</div>
+            <div className="text-sm font-medium">{session?.name || session?.username || "Operations Admin"}</div>
+            <div className="text-xs text-muted-foreground">{session?.role === "super_admin" ? "Super admin" : "Admin"}</div>
           </div>
         </div>
       </div>

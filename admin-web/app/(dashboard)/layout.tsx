@@ -10,6 +10,7 @@ import { useAdminSessionStore } from "@/stores/admin-session-store";
 const routePermissions: {
   prefix: string;
   permission?: AdminPermission;
+  anyPermission?: AdminPermission[];
   superAdminOnly?: boolean;
 }[] = [
   { prefix: "/dashboard", permission: "analytics.read" },
@@ -20,13 +21,14 @@ const routePermissions: {
   { prefix: "/reports", permission: "reports.read" },
   { prefix: "/support", permission: "support.read" },
   { prefix: "/content", permission: "content.read" },
-  { prefix: "/system/admins", superAdminOnly: true }
+  { prefix: "/system/admins", anyPermission: ["admins.read", "admins.manage"] }
 ];
 
 function canAccessPath(session: { role: string; permissions: string[] }, pathname: string) {
   const rule = routePermissions.find((item) => pathname === item.prefix || pathname.startsWith(`${item.prefix}/`));
   if (!rule) return true;
   if (rule.superAdminOnly) return isSuperAdmin(session);
+  if (rule.anyPermission) return isSuperAdmin(session) || rule.anyPermission.some((permission) => hasPermission(session, permission));
   return rule.permission ? hasPermission(session, rule.permission) : true;
 }
 

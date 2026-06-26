@@ -2,13 +2,16 @@
 
 import { create } from "zustand";
 import { fetchAdminMe, loginAdmin } from "@/services/admin-auth";
+import { normalizeAdminRole } from "@/shared/auth/permissions";
 
 type AdminSession = {
   id: string;
   username: string;
   name: string | null;
-  role: string;
+  role: "admin" | "super_admin";
   permissions: string[];
+  tokenType: "env_admin" | "admin_account";
+  mustChangePassword?: boolean;
   token: string;
 };
 
@@ -34,19 +37,17 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
 
     try {
       const result = await fetchAdminMe(token);
-      if (!["admin", "super_admin"].includes(result.user.role)) {
-        window.localStorage.removeItem("nearfix-admin-token");
-        set({ session: null, isSessionReady: true });
-        return;
-      }
+      const role = normalizeAdminRole(result.user.role);
 
       set({
         session: {
           id: result.user.id,
           username: result.user.username,
           name: result.user.name,
-          role: result.user.role,
+          role,
           permissions: result.user.permissions || [],
+          tokenType: result.user.tokenType,
+          mustChangePassword: result.user.mustChangePassword,
           token
         },
         isSessionReady: true
@@ -59,9 +60,7 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
   login: async (username, password) => {
     try {
       const result = await loginAdmin(username, password);
-      if (!["admin", "super_admin"].includes(result.user.role)) {
-        return { ok: false, message: "Admin role required" };
-      }
+      const role = normalizeAdminRole(result.user.role);
 
       window.localStorage.setItem("nearfix-admin-token", result.token);
       set({
@@ -69,16 +68,17 @@ export const useAdminSessionStore = create<AdminSessionState>((set, get) => ({
           id: result.user.id,
           username: result.user.username,
           name: result.user.name,
-          role: result.user.role,
+          role,
           permissions: result.user.permissions || [],
+          tokenType: result.user.tokenType,
+          mustChangePassword: result.user.mustChangePassword,
           token: result.token
         },
         isSessionReady: true
       });
       return { ok: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Login failed";
-      return { ok: false, message };
+    } catch {
+      return { ok: false, message: "Username yoki password noto'g'ri." };
     }
   },
   logout: () => {

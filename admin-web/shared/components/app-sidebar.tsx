@@ -32,15 +32,22 @@ const contentNavItems = [
 }[];
 
 const systemNavItems = [
-  { href: "/system/admins", label: "Admins", icon: Shield }
-];
+  { href: "/system/admins", label: "Admins", icon: Shield, permissions: ["admins.read", "admins.manage"] }
+] satisfies {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permissions: AdminPermission[];
+}[];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const session = useAdminSessionStore((state) => state.session);
   const visibleNavItems = navItems.filter((item) => hasPermission(session, item.permission));
   const visibleContentNavItems = contentNavItems.filter((item) => hasPermission(session, item.permission));
-  const visibleSystemNavItems = isSuperAdmin(session) ? systemNavItems : [];
+  const visibleSystemNavItems = systemNavItems.filter(
+    (item) => isSuperAdmin(session) || item.permissions.some((permission) => hasPermission(session, permission))
+  );
 
   function renderLink(item: { href: string; label: string; icon: typeof LayoutDashboard }) {
     const Icon = item.icon;

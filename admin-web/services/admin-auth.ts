@@ -11,6 +11,8 @@ export type AdminLoginResponse = {
     role: string;
     permissions: string[];
     sessionVersion: number;
+    tokenType: "env_admin" | "admin_account";
+    mustChangePassword?: boolean;
   };
 };
 

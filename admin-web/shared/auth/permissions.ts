@@ -26,10 +26,16 @@ export type AdminPermission = typeof ADMIN_PERMISSIONS[number];
 export type AdminSessionLike = {
   role: string;
   permissions: string[];
+  tokenType?: string;
 };
 
+export function normalizeAdminRole(role?: string | null): "admin" | "super_admin" {
+  return role === "SUPER_ADMIN" || role === "super_admin" ? "super_admin" : "admin";
+}
+
 export function isSuperAdmin(session?: AdminSessionLike | null) {
-  return session?.role === "super_admin";
+  if (!session) return false;
+  return session.tokenType === "env_admin" || normalizeAdminRole(session.role) === "super_admin";
 }
 
 export function hasPermission(session: AdminSessionLike | null | undefined, permission: AdminPermission) {
