@@ -21,6 +21,8 @@
     "test:otp-security": "tsx scripts/otp-security-tests.ts",
     "test:password-auth": "tsx scripts/password-auth-tests.ts",
     "test:eskiz-provider": "tsx scripts/eskiz-provider-tests.ts",
+    "test:admin-account-auth": "tsx scripts/admin-account-auth-tests.ts",
+    "test:admin-management": "tsx scripts/admin-management-tests.ts",
     "test:auth-api": "tsx scripts/auth-api-tests.ts",
     "test:legal-routes": "tsx scripts/legal-routes-test.ts",
     "test:sprint-b": "tsx scripts/sprint-b-smoke.ts"

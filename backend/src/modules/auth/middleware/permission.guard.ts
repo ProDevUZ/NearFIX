@@ -4,7 +4,9 @@ import { isAdminRole, isSuperAdminRole } from "../permissions.js";
 
 export function requirePermission(permission: AdminPermission): RequestHandler {
   return (request, _response, next) => {
-    if (!request.user) {
+    const admin = request.admin || request.user;
+
+    if (!admin) {
       next(
         Object.assign(new Error("Unauthorized"), {
           status: 401,
@@ -14,12 +16,12 @@ export function requirePermission(permission: AdminPermission): RequestHandler {
       return;
     }
 
-    if (isSuperAdminRole(request.user.role)) {
+    if (isSuperAdminRole(admin.role)) {
       next();
       return;
     }
 
-    if (!isAdminRole(request.user.role)) {
+    if (!isAdminRole(admin.role)) {
       next(
         Object.assign(new Error("Forbidden"), {
           status: 403,
@@ -29,7 +31,7 @@ export function requirePermission(permission: AdminPermission): RequestHandler {
       return;
     }
 
-    if (!request.user.permissions.includes(permission)) {
+    if (!admin.permissions.includes(permission)) {
       next(
         Object.assign(new Error("Permission required"), {
           status: 403,
@@ -45,7 +47,9 @@ export function requirePermission(permission: AdminPermission): RequestHandler {
 
 export function requireSuperAdmin(): RequestHandler {
   return (request, _response, next) => {
-    if (!request.user) {
+    const admin = request.admin || request.user;
+
+    if (!admin) {
       next(
         Object.assign(new Error("Unauthorized"), {
           status: 401,
@@ -55,7 +59,7 @@ export function requireSuperAdmin(): RequestHandler {
       return;
     }
 
-    if (!isSuperAdminRole(request.user.role)) {
+    if (!isSuperAdminRole(admin.role)) {
       next(
         Object.assign(new Error("Super admin access required"), {
           status: 403,
@@ -73,7 +77,9 @@ export function requireAdminPermissionIfAdmin(permission: AdminPermission): Requ
   const guard = requirePermission(permission);
 
   return (request, response, next) => {
-    if (request.user && isAdminRole(request.user.role)) {
+    const admin = request.admin || request.user;
+
+    if (admin && isAdminRole(admin.role)) {
       guard(request, response, next);
       return;
     }

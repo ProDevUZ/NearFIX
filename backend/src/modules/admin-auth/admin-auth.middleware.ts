@@ -1,21 +1,22 @@
 import type { RequestHandler } from "express";
 import { bearerTokenSchema } from "../auth/auth.contracts.js";
-import { verifyEnvAdminToken } from "./admin-auth.service.js";
+import { verifyAdminToken } from "./admin-auth.service.js";
 
-export const authenticateEnvAdmin: RequestHandler = (request, _response, next) => {
+export const authenticateEnvAdmin: RequestHandler = async (request, _response, next) => {
   try {
     const token = bearerTokenSchema.parse(request.headers.authorization || "");
-    const user = verifyEnvAdminToken(token);
+    const admin = await verifyAdminToken(token);
 
-    if (!user) {
-      throw Object.assign(new Error("Env admin token required"), {
+    if (!admin) {
+      throw Object.assign(new Error("Admin token required"), {
         status: 401,
         code: "ADMIN_UNAUTHORIZED"
       });
     }
 
     request.accessToken = token;
-    request.user = user;
+    request.admin = admin;
+    request.user = admin;
     next();
   } catch (error) {
     if (typeof error === "object" && error && "status" in error && error.status === 401) {

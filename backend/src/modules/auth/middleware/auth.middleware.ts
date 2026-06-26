@@ -5,6 +5,14 @@ import { requireAuth } from "../auth-context.js";
 export const authenticate: RequestHandler = async (request, _response, next) => {
   try {
     const accessToken = bearerTokenSchema.parse(request.headers.authorization || "");
+
+    if (request.admin) {
+      request.accessToken = accessToken;
+      request.user = request.admin;
+      next();
+      return;
+    }
+
     const user = await requireAuth(request);
 
     request.accessToken = accessToken;
