@@ -12,7 +12,6 @@ const registerCode = "4312";
 const aliasRegisterCode = "9824";
 const resetCode = "7654";
 const oldPassword = "ApiPassword-123";
-const aliasPassword = "AliasPassword-123";
 const newPassword = "ApiPassword-456";
 
 async function cleanup() {
@@ -84,12 +83,17 @@ async function main() {
 
     const aliasRegisterVerify = await post("/auth/otp/verify", {
       phone: aliasPhone,
-      code: aliasRegisterCode,
-      password: aliasPassword
+      code: aliasRegisterCode
     });
     assert.equal(aliasRegisterVerify.response.status, 201);
     assert.ok(aliasRegisterVerify.payload.accessToken);
     assert.ok(aliasRegisterVerify.payload.refreshToken);
+
+    const aliasUser = await prisma.user.findUniqueOrThrow({
+      where: { phone: aliasPhone }
+    });
+    assert.equal(aliasUser.passwordHash, null);
+    assert.equal(aliasUser.passwordSetAt, null);
 
     const registerRequest = await post("/auth/register/otp/request", { phone });
     assert.equal(registerRequest.response.status, 202);

@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import {
   forgotPasswordOtpRequestSchema,
   forgotPasswordOtpVerifySchema,
+  legacyOtpVerifySchema,
   passwordLoginSchema,
   refreshTokenSchema,
   registerOtpRequestSchema,
@@ -12,8 +13,10 @@ import { authenticate } from "./middleware/auth.middleware.js";
 import { otpRequestIpRateLimit } from "./middleware/otp-ip-rate-limit.js";
 import { deleteCurrentUserAccount } from "./account-deletion.service.js";
 import {
+  authenticateWithLegacyOtp,
   loginWithPassword,
   refreshAccessToken,
+  requestLegacyOtp,
   registerWithOtp,
   requestForgotPasswordOtp,
   requestRegistrationOtp,
@@ -52,9 +55,37 @@ const verifyRegistrationOtpHandler: RequestHandler = async (request, response, n
   }
 };
 
-authRouter.post("/otp/request", otpRequestIpRateLimit, requestRegistrationOtpHandler);
+const requestLegacyOtpHandler: RequestHandler = async (request, response, next) => {
+  try {
+    const input = registerOtpRequestSchema.parse(request.body);
+    const result = await requestLegacyOtp(input);
+
+    response.status(202).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const verifyLegacyOtpHandler: RequestHandler = async (request, response, next) => {
+  try {
+    const input = legacyOtpVerifySchema.parse(request.body);
+    const result = await authenticateWithLegacyOtp(input);
+
+    response.status(201).json({
+      ok: true,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      token: result.token,
+      user: result.user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+authRouter.post("/otp/request", otpRequestIpRateLimit, requestLegacyOtpHandler);
 authRouter.post("/register/otp/request", otpRequestIpRateLimit, requestRegistrationOtpHandler);
-authRouter.post("/otp/verify", verifyRegistrationOtpHandler);
+authRouter.post("/otp/verify", verifyLegacyOtpHandler);
 authRouter.post("/register/otp/verify", verifyRegistrationOtpHandler);
 
 authRouter.post("/login", async (request, response, next) => {

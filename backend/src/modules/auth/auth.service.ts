@@ -147,6 +147,28 @@ export async function requestRegistrationOtp(
   return authTimingResponse(service);
 }
 
+export async function requestLegacyOtp(
+  input: { phone: string },
+  authProvider: AuthProvider = defaultAuthProvider,
+  service: OtpService = otpService
+) {
+  const phone = normalizePhone(input.phone);
+  const existingUser = await prisma.user.findUnique({
+    where: { phone },
+    select: { status: true }
+  });
+
+  if (existingUser?.status === UserStatus.BLOCKED) {
+    throw Object.assign(new Error("User account is blocked"), {
+      status: 403,
+      code: "USER_BLOCKED"
+    });
+  }
+
+  await deliverOtp(phone, OtpPurpose.REGISTER, authProvider, service);
+  return authTimingResponse(service);
+}
+
 export async function registerWithOtp(
   input: { phone: string; code: string; password: string },
   service: OtpService = otpService
@@ -182,6 +204,49 @@ export async function registerWithOtp(
       throw phoneAlreadyRegisteredError();
     }
     throw error;
+  }
+
+  return createSessionForUser(user);
+}
+
+export async function authenticateWithLegacyOtp(
+  input: { phone: string; code: string },
+  service: OtpService = otpService
+) {
+  const phone = normalizePhone(input.phone);
+
+  await service.verifyChallenge(phone, OtpPurpose.REGISTER, input.code);
+
+  let user = await prisma.user.findUnique({
+    where: { phone },
+    include: {
+      adminPermissions: true
+    }
+  });
+
+  if (!user) {
+    try {
+      user = await prisma.user.create({
+        data: {
+          phone,
+          role: UserRole.CLIENT
+        },
+        include: {
+          adminPermissions: true
+        }
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        user = await prisma.user.findUniqueOrThrow({
+          where: { phone },
+          include: {
+            adminPermissions: true
+          }
+        });
+      } else {
+        throw error;
+      }
+    }
   }
 
   return createSessionForUser(user);

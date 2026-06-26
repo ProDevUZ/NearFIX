@@ -25,6 +25,11 @@ export const registerOtpVerifySchema = z.object({
   password: passwordSchema
 });
 
+export const legacyOtpVerifySchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema
+});
+
 export const passwordLoginSchema = z.object({
   phone: phoneSchema,
   password: loginPasswordSchema
