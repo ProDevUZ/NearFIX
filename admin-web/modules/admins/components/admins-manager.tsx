@@ -51,6 +51,23 @@ function permissionLabel(permission: AdminPermission) {
   return permission.replace(".", " ");
 }
 
+function validateAdminInput(username: string, password: string, name?: string) {
+  const trimmedUsername = username.trim();
+  const trimmedName = name?.trim() || "";
+  const normalizedPassword = password.toLowerCase();
+  const trivialPasswords = new Set(["admin321", "password", "password123", "12345678", "1234567890", "qwerty123"]);
+
+  if (trimmedUsername.length < 3) return "Username kamida 3 ta belgi bo'lishi kerak.";
+  if (trimmedName && trimmedName.length < 2) return "Name bo'lsa kamida 2 ta belgi bo'lishi kerak.";
+  if (password.length < 10) return "Temporary password kamida 10 ta belgi bo'lishi kerak.";
+  if (trivialPasswords.has(normalizedPassword)) return "Temporary password juda oddiy.";
+  if (normalizedPassword.includes(trimmedUsername.toLowerCase())) {
+    return "Temporary password username bilan bir xil bo'lmasin yoki username'ni ichiga olmasin.";
+  }
+
+  return null;
+}
+
 function TogglePermissionList({
   disabled,
   selected,
@@ -223,6 +240,13 @@ export function AdminsManager() {
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = validateAdminInput(createUsername, createPassword, createName);
+    if (validationError) {
+      setMessage(null);
+      setErrorMessage(validationError);
+      return;
+    }
+
     createMutation.mutate({
       username: createUsername.trim(),
       password: createPassword,
@@ -257,6 +281,13 @@ export function AdminsManager() {
   function handlePasswordReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedAdmin) return;
+    const validationError = validateAdminInput(selectedAdmin.username, resetPasswordValue);
+    if (validationError) {
+      setMessage(null);
+      setErrorMessage(validationError);
+      return;
+    }
+
     passwordMutation.mutate({ adminId: selectedAdmin.id, password: resetPasswordValue });
   }
 
