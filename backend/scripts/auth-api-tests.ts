@@ -1,24 +1,31 @@
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
-import { OtpPurpose } from "@prisma/client";
-import { prisma } from "../src/db/prisma.js";
-import { createApp } from "../src/http/app.js";
-import { hashOtpCode } from "../src/modules/auth/otp.service.js";
+
+process.env.OTP_PROVIDER = "fake";
+process.env.APP_REVIEW_DEMO_ENABLED = "true";
+process.env.APP_REVIEW_DEMO_CLIENT_PHONE = "+998991119913";
+process.env.APP_REVIEW_DEMO_CLIENT_PASSWORD = "DemoClient-123";
+process.env.APP_REVIEW_DEMO_WORKER_PHONE = "+998991119914";
+process.env.APP_REVIEW_DEMO_WORKER_PASSWORD = "DemoWorker-123";
+
+const { OtpPurpose, UserRole } = await import("@prisma/client");
+const { prisma } = await import("../src/db/prisma.js");
+const { env } = await import("../src/config/env.js");
+const { createApp } = await import("../src/http/app.js");
+const { hashOtpCode } = await import("../src/modules/auth/otp.service.js");
 
 const phone = "+998991119911";
 const unknownPhone = "+998991119912";
-const aliasPhone = "+998991119913";
-const registerCode = "4312";
-const aliasRegisterCode = "9824";
-const resetCode = "7654";
-const oldPassword = "ApiPassword-123";
-const newPassword = "ApiPassword-456";
+const demoClientPhone = "+998991119913";
+const demoWorkerPhone = "+998991119914";
+const otpCode = "5454";
 
 async function cleanup() {
+  const phones = [phone, unknownPhone, demoClientPhone, demoWorkerPhone];
   const users = await prisma.user.findMany({
     where: {
       phone: {
-        in: [phone, unknownPhone, aliasPhone]
+        in: phones
       }
     },
     select: { id: true }
@@ -34,21 +41,72 @@ async function cleanup() {
   await prisma.otpChallenge.deleteMany({
     where: {
       phone: {
-        in: [phone, unknownPhone, aliasPhone]
+        in: phones
+      }
+    }
+  });
+  await prisma.otpSession.deleteMany({
+    where: {
+      phone: {
+        in: phones
+      }
+    }
+  });
+  await prisma.workerProfile.deleteMany({
+    where: {
+      userId: {
+        in: users.map((user) => user.id)
       }
     }
   });
   await prisma.user.deleteMany({
     where: {
       phone: {
-        in: [phone, unknownPhone, aliasPhone]
+        in: phones
       }
+    }
+  });
+}
+
+async function setOtp(phoneNumber: string, code: string) {
+  await prisma.otpChallenge.updateMany({
+    where: {
+      phone: phoneNumber,
+      purpose: OtpPurpose.REGISTER,
+      consumedAt: null
+    },
+    data: {
+      codeHash: hashOtpCode(phoneNumber, code)
     }
   });
 }
 
 async function main() {
   await cleanup();
+
+  const demoClient = await prisma.user.create({
+    data: {
+      phone: demoClientPhone,
+      role: UserRole.CLIENT,
+      name: "App Review Client"
+    }
+  });
+  const demoWorker = await prisma.user.create({
+    data: {
+      phone: demoWorkerPhone,
+      role: UserRole.PROVIDER,
+      name: "App Review Worker"
+    }
+  });
+  await prisma.workerProfile.create({
+    data: {
+      userId: demoWorker.id,
+      status: "APPROVED",
+      profession: "Demo worker",
+      professions: ["Demo worker"]
+    }
+  });
+
   const server = createApp().listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
   const address = server.address() as AddressInfo;
@@ -66,128 +124,120 @@ async function main() {
     return { response, payload };
   }
 
+  async function get(path: string, token?: string) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  }
+
   try {
-    const aliasRegisterRequest = await post("/auth/otp/request", { phone: aliasPhone });
-    assert.equal(aliasRegisterRequest.response.status, 202);
+    const normalRequest = await post("/auth/otp/request", { phone });
+    assert.equal(normalRequest.response.status, 202);
+    assert.equal(normalRequest.payload.nextStep, undefined);
 
-    await prisma.otpChallenge.updateMany({
+    await setOtp(phone, otpCode);
+    const normalVerify = await post("/auth/otp/verify", {
+      phone,
+      code: otpCode
+    });
+    assert.equal(normalVerify.response.status, 200);
+    assert.ok(normalVerify.payload.accessToken);
+    assert.ok(normalVerify.payload.refreshToken);
+    assert.equal(normalVerify.payload.otpSessionToken, undefined);
+    assert.equal(normalVerify.payload.nextStep, undefined);
+
+    const normalMe = await get("/auth/me", normalVerify.payload.accessToken);
+    assert.equal(normalMe.response.status, 200);
+    assert.equal(normalMe.payload.user.phone, phone);
+
+    const disabledPasswordLogin = await post("/auth/password/login", {
+      otpSessionToken: "unused-token-that-is-long-enough",
+      password: "AnyPassword-123"
+    });
+    assert.equal(disabledPasswordLogin.response.status, 410);
+    assert.equal(disabledPasswordLogin.payload.code, "PASSWORD_AUTH_DISABLED");
+
+    const normalUser = await prisma.user.findUniqueOrThrow({
+      where: { phone }
+    });
+    assert.equal(normalUser.passwordHash, null);
+
+    const demoRequest = await post("/auth/otp/request", { phone: demoClientPhone });
+    assert.equal(demoRequest.response.status, 202);
+    assert.equal(demoRequest.payload.nextStep, "APP_REVIEW_PASSWORD_REQUIRED");
+    const demoChallengeCount = await prisma.otpChallenge.count({
       where: {
-        phone: aliasPhone,
-        purpose: OtpPurpose.REGISTER,
-        consumedAt: null
-      },
-      data: {
-        codeHash: hashOtpCode(aliasPhone, aliasRegisterCode)
+        phone: demoClientPhone
       }
     });
+    assert.equal(demoChallengeCount, 0);
 
-    const aliasRegisterVerify = await post("/auth/otp/verify", {
-      phone: aliasPhone,
-      code: aliasRegisterCode
-    });
-    assert.equal(aliasRegisterVerify.response.status, 201);
-    assert.ok(aliasRegisterVerify.payload.accessToken);
-    assert.ok(aliasRegisterVerify.payload.refreshToken);
-
-    const aliasUser = await prisma.user.findUniqueOrThrow({
-      where: { phone: aliasPhone }
-    });
-    assert.equal(aliasUser.passwordHash, null);
-    assert.equal(aliasUser.passwordSetAt, null);
-
-    const registerRequest = await post("/auth/register/otp/request", { phone });
-    assert.equal(registerRequest.response.status, 202);
-
-    await prisma.otpChallenge.updateMany({
+    const workerDemoRequest = await post("/auth/otp/request", { phone: demoWorkerPhone });
+    assert.equal(workerDemoRequest.response.status, 202);
+    assert.equal(workerDemoRequest.payload.nextStep, "APP_REVIEW_PASSWORD_REQUIRED");
+    const workerDemoChallengeCount = await prisma.otpChallenge.count({
       where: {
-        phone,
-        purpose: OtpPurpose.REGISTER,
-        consumedAt: null
-      },
-      data: {
-        codeHash: hashOtpCode(phone, registerCode)
+        phone: demoWorkerPhone
       }
     });
+    assert.equal(workerDemoChallengeCount, 0);
 
-    const registerVerify = await post("/auth/register/otp/verify", {
-      phone,
-      code: registerCode,
-      password: oldPassword
+    const demoLogin = await post("/auth/app-review/login", {
+      phone: demoClientPhone,
+      password: "DemoClient-123"
     });
-    assert.equal(registerVerify.response.status, 201);
-    assert.ok(registerVerify.payload.accessToken);
-    assert.ok(registerVerify.payload.refreshToken);
+    assert.equal(demoLogin.response.status, 200);
+    assert.ok(demoLogin.payload.accessToken);
+    assert.ok(demoLogin.payload.refreshToken);
+    assert.equal(demoLogin.payload.user.role, "client");
 
-    const login = await post("/auth/login", {
-      phone,
-      password: oldPassword
+    const demoMe = await get("/auth/me", demoLogin.payload.accessToken);
+    assert.equal(demoMe.response.status, 200);
+    assert.equal(demoMe.payload.user.phone, demoClientPhone);
+    assert.equal(demoMe.payload.user.role, "client");
+
+    const workerDemoLogin = await post("/auth/app-review/login", {
+      phone: demoWorkerPhone,
+      password: "DemoWorker-123"
     });
-    assert.equal(login.response.status, 200);
-    assert.ok(login.payload.accessToken);
+    assert.equal(workerDemoLogin.response.status, 200);
+    assert.equal(workerDemoLogin.payload.user.role, "provider");
 
-    const wrongPassword = await post("/auth/login", {
-      phone,
+    const wrongDemoPassword = await post("/auth/app-review/login", {
+      phone: demoClientPhone,
       password: "WrongPassword-123"
     });
-    assert.equal(wrongPassword.response.status, 401);
-    assert.equal(wrongPassword.payload.code, "INVALID_CREDENTIALS");
+    assert.equal(wrongDemoPassword.response.status, 401);
+    assert.equal(wrongDemoPassword.payload.code, "INVALID_CREDENTIALS");
 
-    const shortWrongPassword = await post("/auth/login", {
-      phone,
-      password: "wrong"
+    const nonAllowlistedDemo = await post("/auth/app-review/login", {
+      phone: unknownPhone,
+      password: "DemoClient-123"
     });
-    assert.equal(shortWrongPassword.response.status, 401);
-    assert.equal(shortWrongPassword.payload.code, "INVALID_CREDENTIALS");
+    assert.equal(nonAllowlistedDemo.response.status, 401);
+    assert.equal(nonAllowlistedDemo.payload.code, "INVALID_CREDENTIALS");
 
-    const unknownForgot = await post("/auth/password/forgot/request", {
-      phone: unknownPhone
+    env.APP_REVIEW_DEMO_ENABLED = false;
+    const disabledDemo = await post("/auth/app-review/login", {
+      phone: demoClientPhone,
+      password: "DemoClient-123"
     });
-    assert.equal(unknownForgot.response.status, 202);
-    assert.equal(unknownForgot.payload.ok, true);
+    assert.equal(disabledDemo.response.status, 404);
+    assert.equal(disabledDemo.payload.code, "APP_REVIEW_DEMO_DISABLED");
+    env.APP_REVIEW_DEMO_ENABLED = true;
 
-    const forgotRequest = await post("/auth/password/forgot/request", { phone });
-    assert.equal(forgotRequest.response.status, 202);
-    assert.equal(forgotRequest.payload.ok, true);
-    assert.deepEqual(forgotRequest.payload, unknownForgot.payload);
-
-    await prisma.otpChallenge.updateMany({
-      where: {
-        phone,
-        purpose: OtpPurpose.PASSWORD_RESET,
-        consumedAt: null
-      },
-      data: {
-        codeHash: hashOtpCode(phone, resetCode)
-      }
+    await prisma.user.update({
+      where: { id: demoClient.id },
+      data: { role: UserRole.ADMIN }
     });
-
-    const forgotVerify = await post("/auth/password/forgot/verify", {
-      phone,
-      code: resetCode,
-      newPassword
+    const adminRoleDemo = await post("/auth/app-review/login", {
+      phone: demoClientPhone,
+      password: "DemoClient-123"
     });
-    assert.equal(forgotVerify.response.status, 200);
-    assert.equal(forgotVerify.payload.passwordUpdated, true);
-
-    const oldPasswordLogin = await post("/auth/login", {
-      phone,
-      password: oldPassword
-    });
-    assert.equal(oldPasswordLogin.response.status, 401);
-    assert.equal(oldPasswordLogin.payload.code, "INVALID_CREDENTIALS");
-
-    const newPasswordLogin = await post("/auth/login", {
-      phone,
-      password: newPassword
-    });
-    assert.equal(newPasswordLogin.response.status, 200);
-    assert.ok(newPasswordLogin.payload.accessToken);
-
-    const removedLegacyPhoneLogin = await post("/auth/phone", {
-      phone,
-      code: resetCode
-    });
-    assert.equal(removedLegacyPhoneLogin.response.status, 404);
+    assert.equal(adminRoleDemo.response.status, 401);
+    assert.equal(adminRoleDemo.payload.code, "INVALID_CREDENTIALS");
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

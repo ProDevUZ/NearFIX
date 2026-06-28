@@ -186,39 +186,40 @@ enum ReportStatus {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  phone          String     @unique
-  name           String?
-  role           UserRole   @default(CLIENT)
-  status         UserStatus @default(ACTIVE)
-  cityId         String?
-  passwordHash   String?
-  passwordSetAt  DateTime?
-  sessionVersion Int        @default(1)
-  deletedAt      DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  phone             String     @unique
+  name              String?
+  role              UserRole   @default(CLIENT)
+  status            UserStatus @default(ACTIVE)
+  cityId            String?
+  passwordHash      String?
+  passwordSetAt     DateTime?
+  passwordChangedAt DateTime?
+  sessionVersion    Int        @default(1)
+  deletedAt         DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  sessions        Session[]
+  sessions         Session[]
   adminPermissions AdminPermission[]
-  workerProfile   WorkerProfile?
-  addresses       Address[]
-  clientOrders    Order[]           @relation("ClientOrders")
-  chatMessages    ChatMessage[]
-  chatRooms       ChatRoom[]        @relation("ChatRoomCreator")
-  chatMemberships ChatParticipant[]
-  media           Media[]
-  reviews         Review[]          @relation("ClientReviews")
-  favorites       Favorite[]        @relation("ClientFavorites")
-  orderEvents     OrderEvent[]      @relation("OrderEventActor")
-  notifications   Notification[]
-  pushTokens      PushToken[]
-  supportTickets  SupportTicket[]
-  reportsCreated  Report[]          @relation("ReportReporter")
-  reportsResolved Report[]          @relation("ReportResolver")
-  blocksCreated   UserBlock[]       @relation("Blocker")
-  blocksReceived  UserBlock[]       @relation("BlockedUser")
-  supportResolved SupportTicket[]   @relation("SupportResolver")
+  workerProfile    WorkerProfile?
+  addresses        Address[]
+  clientOrders     Order[]           @relation("ClientOrders")
+  chatMessages     ChatMessage[]
+  chatRooms        ChatRoom[]        @relation("ChatRoomCreator")
+  chatMemberships  ChatParticipant[]
+  media            Media[]
+  reviews          Review[]          @relation("ClientReviews")
+  favorites        Favorite[]        @relation("ClientFavorites")
+  orderEvents      OrderEvent[]      @relation("OrderEventActor")
+  notifications    Notification[]
+  pushTokens       PushToken[]
+  supportTickets   SupportTicket[]
+  reportsCreated   Report[]          @relation("ReportReporter")
+  reportsResolved  Report[]          @relation("ReportResolver")
+  blocksCreated    UserBlock[]       @relation("Blocker")
+  blocksReceived   UserBlock[]       @relation("BlockedUser")
+  supportResolved  SupportTicket[]   @relation("SupportResolver")
 }
 
 model AdminPermission {
@@ -301,20 +302,38 @@ model Session {
 }
 
 model OtpChallenge {
-  id                String    @id @default(cuid())
+  id                String     @id @default(cuid())
   phone             String
   purpose           OtpPurpose
   codeHash          String
   expiresAt         DateTime
-  attempts          Int       @default(0)
-  maxAttempts       Int       @default(5)
+  attempts          Int        @default(0)
+  maxAttempts       Int        @default(5)
   consumedAt        DateTime?
   resendAfter       DateTime
   providerMessageId String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   @@index([phone, purpose])
+  @@index([expiresAt])
+  @@index([consumedAt])
+}
+
+model OtpSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  phone      String
+  userId     String?
+  purpose    String
+  nextStep   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+  @@index([userId])
+  @@index([purpose])
   @@index([expiresAt])
   @@index([consumedAt])
 }

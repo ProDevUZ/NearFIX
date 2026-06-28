@@ -180,7 +180,7 @@ export function ClientProfileScreen({ navigation, route }) {
   async function handleSaveProfile() {
     const cleanName = nameDraft.trim();
     if (cleanName.length < 2) {
-      Alert.alert("Ism familiya kerak", "Kamida 2 ta belgidan iborat ism familiya kiriting.");
+      Alert.alert("Ism kerak", "Kamida 2 ta belgidan iborat ism kiriting.");
       return;
     }
 
@@ -367,7 +367,7 @@ export function ClientProfileScreen({ navigation, route }) {
                   autoCapitalize="words"
                   value={nameDraft}
                   onChangeText={setNameDraft}
-                  placeholder="Ism Familiya"
+                  placeholder="Ism"
                   placeholderTextColor="#A0A7B3"
                   style={styles.profileInput}
                 />

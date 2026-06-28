@@ -14,13 +14,40 @@ function otpRequestResult(payload) {
   return {
     ok: true,
     expiresIn: payload.expiresIn,
-    resendIn: payload.resendIn
+    resendIn: payload.resendIn,
+    nextStep: payload.nextStep
   };
 }
 
-export async function loginWithPassword(phone, password) {
+export async function requestAuthOtp(phone, purpose = "AUTH") {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/login", {
+    const payload = await httpRequest("/auth/otp/request", {
+      method: "POST",
+      body: { phone, purpose }
+    });
+
+    return otpRequestResult(payload);
+  });
+}
+
+export async function requestRegisterOtp(phone) {
+  return requestAuthOtp(phone, "AUTH");
+}
+
+export async function verifyAuthOtp(phone, code, purpose = "AUTH") {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/otp/verify", {
+      method: "POST",
+      body: { phone, code, purpose }
+    });
+
+    return authSessionResult(payload);
+  });
+}
+
+export async function loginWithAppReviewDemo(phone, password) {
+  return apiRequest(async () => {
+    const payload = await httpRequest("/auth/app-review/login", {
       method: "POST",
       body: { phone, password }
     });
@@ -29,22 +56,11 @@ export async function loginWithPassword(phone, password) {
   });
 }
 
-export async function requestRegisterOtp(phone) {
+export async function loginWithPassword(otpSessionToken, password) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/register/otp/request", {
+    const payload = await httpRequest("/auth/password/login", {
       method: "POST",
-      body: { phone }
-    });
-
-    return otpRequestResult(payload);
-  });
-}
-
-export async function verifyRegisterOtp(phone, code, password) {
-  return apiRequest(async () => {
-    const payload = await httpRequest("/auth/register/otp/verify", {
-      method: "POST",
-      body: { phone, code, password }
+      body: { otpSessionToken, password }
     });
 
     return authSessionResult(payload);
@@ -52,27 +68,28 @@ export async function verifyRegisterOtp(phone, code, password) {
 }
 
 export async function requestForgotPasswordOtp(phone) {
+  return requestAuthOtp(phone, "PASSWORD_RESET");
+}
+
+export async function setupPassword(otpSessionToken, password, confirmPassword) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/password/forgot/request", {
+    const payload = await httpRequest("/auth/password/setup", {
       method: "POST",
-      body: { phone }
+      body: { otpSessionToken, password, confirmPassword }
     });
 
-    return otpRequestResult(payload);
+    return authSessionResult(payload);
   });
 }
 
-export async function verifyForgotPasswordOtp(phone, code, newPassword) {
+export async function resetPassword(otpSessionToken, password, confirmPassword) {
   return apiRequest(async () => {
-    const payload = await httpRequest("/auth/password/forgot/verify", {
+    const payload = await httpRequest("/auth/password/reset", {
       method: "POST",
-      body: { phone, code, newPassword }
+      body: { otpSessionToken, password, confirmPassword }
     });
 
-    return {
-      ok: true,
-      passwordUpdated: payload.passwordUpdated
-    };
+    return authSessionResult(payload);
   });
 }
 

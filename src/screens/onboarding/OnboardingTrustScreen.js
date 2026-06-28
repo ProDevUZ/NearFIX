@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
   onboarding: {
     minHeight: "100%",
     padding: 24,
-    gap: 18,
+    gap: 12,
     justifyContent: "space-between",
     backgroundColor: colors.background
   },
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   heroPanel: {
-    height: 360,
+    height: 326,
     borderRadius: 34,
     backgroundColor: "transparent",
     alignItems: "center",
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "7deg" }]
   },
   contentCard: {
-    gap: 16
+    gap: 12
   },
   title: {
     color: colors.text,

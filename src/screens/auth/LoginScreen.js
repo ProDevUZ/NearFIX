@@ -3,22 +3,19 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-nativ
 import { ShieldCheck, Smartphone } from "lucide-react-native";
 import { PrimaryButton } from "../../components/ui/Button";
 import { ROUTES } from "../../constants/routes";
-import { useAuthStore } from "../../store/authStore";
+import { requestAuthOtp } from "../../services/auth";
 import { colors, iconSizes, radius } from "../../theme";
 import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
 import { AuthScreenLayout, authStyles } from "./AuthScreenLayout";
 import {
   authErrorMessage,
   isValidUzPhone,
-  normalizeUzPhone,
-  passwordValidationMessage
+  normalizeUzPhone
 } from "./authHelpers";
 
 export function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
 
   async function handleLogin() {
     if (loading) return;
@@ -29,21 +26,28 @@ export function LoginScreen({ navigation }) {
       return;
     }
 
-    const passwordError = passwordValidationMessage(password);
-    if (passwordError) {
-      Alert.alert("Parol noto'g'ri", passwordError);
-      return;
-    }
-
     setLoading(true);
     try {
-      const result = await login(normalizedPhone, password);
+      const result = await requestAuthOtp(normalizedPhone, "AUTH");
       if (!result.ok) {
         Alert.alert(
-          "Kirish amalga oshmadi",
+          "SMS yuborilmadi",
           authErrorMessage(result, "Backend bilan ulanishda xatolik yuz berdi.")
         );
+        return;
       }
+
+      if (result.nextStep === "APP_REVIEW_PASSWORD_REQUIRED") {
+        navigation.navigate(ROUTES.DEMO_PASSWORD, {
+          phone: normalizedPhone
+        });
+        return;
+      }
+
+      navigation.navigate(ROUTES.AUTH_OTP, {
+        phone: normalizedPhone,
+        purpose: "AUTH"
+      });
     } finally {
       setLoading(false);
     }
@@ -51,8 +55,8 @@ export function LoginScreen({ navigation }) {
 
   return (
     <AuthScreenLayout
-      title="Xush kelibsiz!"
-      copy="Telefon raqam va parolingiz bilan tizimga kiring."
+      title="Telefon raqamingiz bilan davom eting"
+      copy="SMS kod yuboramiz."
     >
       <View style={styles.trustRow}>
         <View style={styles.trustPill}>
@@ -80,43 +84,16 @@ export function LoginScreen({ navigation }) {
             value={phone}
             editable={!loading}
             onChangeText={setPhone}
+            onSubmitEditing={handleLogin}
           />
         </View>
-
-        <Text style={authStyles.inputLabel}>Parol</Text>
-        <TextInput
-          autoCapitalize="none"
-          autoComplete="current-password"
-          placeholder="Parolingiz"
-          placeholderTextColor={colors.subtle}
-          secureTextEntry
-          style={authStyles.input}
-          value={password}
-          editable={!loading}
-          onChangeText={setPassword}
-          onSubmitEditing={handleLogin}
-        />
-
-        <Pressable
-          disabled={loading}
-          onPress={() => navigation.navigate(ROUTES.FORGOT_PASSWORD)}
-        >
-          <Text style={styles.forgotLink}>Parolni unutdingizmi?</Text>
-        </Pressable>
       </View>
 
       <PrimaryButton
         disabled={loading}
-        title={loading ? "Kirilmoqda..." : "Kirish"}
+        title={loading ? "Yuborilmoqda..." : "Kodni yuborish"}
         onPress={handleLogin}
       />
-
-      <View style={authStyles.linkRow}>
-        <Text style={authStyles.mutedText}>Hisobingiz yo'qmi?</Text>
-        <Pressable disabled={loading} onPress={() => navigation.navigate(ROUTES.REGISTER)}>
-          <Text style={authStyles.linkText}>Ro'yxatdan o'tish</Text>
-        </Pressable>
-      </View>
 
       <View style={styles.legalConsent}>
         <Text style={styles.terms}>Davom etish orqali </Text>
@@ -154,13 +131,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     fontWeight: "900"
-  },
-  forgotLink: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "right",
-    paddingVertical: 4
   },
   terms: {
     color: colors.subtle,

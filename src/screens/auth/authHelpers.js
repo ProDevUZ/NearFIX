@@ -8,7 +8,12 @@ export const AUTH_ERROR_MESSAGES = {
   OTP_COOLDOWN: "Yangi kod yuborish uchun biroz kuting.",
   OTP_RATE_LIMITED: "Juda ko'p kod so'raldi. Keyinroq qayta urinib ko'ring.",
   SMS_SEND_FAILED: "SMS yuborilmadi. Keyinroq qayta urinib ko'ring.",
-  INVALID_PASSWORD: "Parol xavfsizlik talablariga mos emas.",
+  INVALID_PASSWORD: "Parol noto'g'ri.",
+  INVALID_OTP_SESSION: "Tasdiqlash sessiyasi yaroqsiz. SMS kodni qayta tasdiqlang.",
+  OTP_SESSION_EXPIRED: "Tasdiqlash sessiyasi muddati tugagan. SMS kodni qayta tasdiqlang.",
+  PASSWORD_TOO_SHORT: "Parol kamida 6 ta belgidan iborat bo'lishi kerak.",
+  PASSWORD_CONFIRM_MISMATCH: "Parollar mos emas.",
+  APP_REVIEW_DEMO_DISABLED: "Demo kirish vaqtincha o'chirilgan.",
   USER_BLOCKED: "Bu hisob bloklangan. Yordam xizmatiga murojaat qiling."
 };
 
@@ -34,7 +39,7 @@ export function isValidOtp(code) {
 }
 
 export function passwordValidationMessage(password) {
-  if (password.length < 8) return "Parol kamida 8 ta belgidan iborat bo'lishi kerak.";
+  if (password.length < 6) return "Parol kamida 6 ta belgidan iborat bo'lishi kerak.";
   if (password.length > 72) return "Parol 72 ta belgidan oshmasligi kerak.";
   return "";
 }

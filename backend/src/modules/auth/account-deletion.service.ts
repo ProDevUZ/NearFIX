@@ -92,6 +92,7 @@ export async function deleteCurrentUserAccount(userId: string) {
         cityId: null,
         passwordHash: null,
         passwordSetAt: null,
+        passwordChangedAt: null,
         status: UserStatus.DELETED,
         deletedAt,
         sessionVersion: {

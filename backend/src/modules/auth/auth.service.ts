@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { OtpPurpose, Prisma, UserRole, UserStatus } from "@prisma/client";
 import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
@@ -10,15 +11,188 @@ import { ADMIN_PERMISSIONS, type AdminPermission, isAdminRole, isSuperAdminRole 
 import {
   addDays,
   createAccessToken,
+  createRawSessionToken,
   createRefreshToken,
   hashRefreshToken,
+  hashSessionToken,
   verifyAccessToken
 } from "./session.js";
 
 const defaultAuthProvider = createAuthProvider();
+const OTP_SESSION_TTL_SECONDS = 10 * 60;
+
+type OtpRequestPurpose = "AUTH" | "PASSWORD_RESET";
+type OtpNextStep = "PASSWORD_REQUIRED" | "PASSWORD_SETUP_REQUIRED" | "PASSWORD_RESET_REQUIRED";
+
+type DemoAccount = {
+  phone: string;
+  password: string;
+  role: UserRole;
+};
 
 function maskPhone(phone: string) {
   return `${phone.slice(0, 4)}***${phone.slice(-3)}`;
+}
+
+function addSeconds(date: Date, seconds: number) {
+  const next = new Date(date);
+  next.setSeconds(next.getSeconds() + seconds);
+  return next;
+}
+
+async function createOtpSessionToken(input: {
+  phone: string;
+  purpose: OtpRequestPurpose;
+  nextStep: OtpNextStep;
+  userId?: string;
+}) {
+  const rawToken = createRawSessionToken();
+  const now = new Date();
+
+  await prisma.otpSession.create({
+    data: {
+      tokenHash: hashSessionToken(rawToken),
+      phone: input.phone,
+      purpose: input.purpose,
+      nextStep: input.nextStep,
+      userId: input.userId,
+      expiresAt: addSeconds(now, OTP_SESSION_TTL_SECONDS)
+    }
+  });
+
+  return rawToken;
+}
+
+function otpSessionError(message: string, code = "INVALID_OTP_SESSION") {
+  return Object.assign(new Error(message), {
+    status: 401,
+    code
+  });
+}
+
+async function findValidOtpSession(token: string, expected: { purpose: OtpRequestPurpose; nextStep: OtpNextStep }) {
+  const otpSession = await prisma.otpSession.findUnique({
+    where: {
+      tokenHash: hashSessionToken(token)
+    }
+  });
+  const now = new Date();
+
+  if (!otpSession) {
+    throw otpSessionError("OTP session is invalid");
+  }
+
+  if (otpSession.expiresAt <= now) {
+    throw otpSessionError("OTP session expired", "OTP_SESSION_EXPIRED");
+  }
+
+  if (otpSession.consumedAt) {
+    throw otpSessionError("OTP session is invalid");
+  }
+
+  if (otpSession.purpose !== expected.purpose || otpSession.nextStep !== expected.nextStep) {
+    throw otpSessionError("OTP session is invalid");
+  }
+
+  return otpSession;
+}
+
+async function consumeOtpSession(id: string) {
+  const consumed = await prisma.otpSession.updateMany({
+    where: {
+      id,
+      consumedAt: null,
+      expiresAt: {
+        gt: new Date()
+      }
+    },
+    data: {
+      consumedAt: new Date()
+    }
+  });
+
+  if (consumed.count !== 1) {
+    throw otpSessionError("OTP session is invalid");
+  }
+}
+
+function assertPasswordInput(password: string, confirmPassword: string) {
+  if (password.length < 6) {
+    throw Object.assign(new Error("Password is too short"), {
+      status: 400,
+      code: "PASSWORD_TOO_SHORT"
+    });
+  }
+
+  if (password !== confirmPassword) {
+    throw Object.assign(new Error("Password confirmation does not match"), {
+      status: 400,
+      code: "PASSWORD_CONFIRM_MISMATCH"
+    });
+  }
+}
+
+function secureEqual(left: string, right: string) {
+  const leftDigest = crypto.createHash("sha256").update(left).digest();
+  const rightDigest = crypto.createHash("sha256").update(right).digest();
+  return crypto.timingSafeEqual(leftDigest, rightDigest);
+}
+
+function demoModeDisabledError() {
+  return Object.assign(new Error("App Review demo login is disabled"), {
+    status: 404,
+    code: "APP_REVIEW_DEMO_DISABLED"
+  });
+}
+
+function invalidDemoCredentialsError() {
+  return Object.assign(new Error("Invalid demo credentials"), {
+    status: 401,
+    code: "INVALID_CREDENTIALS"
+  });
+}
+
+function passwordAuthDisabledError() {
+  return Object.assign(new Error("Password auth is available only for App Review demo login"), {
+    status: 410,
+    code: "PASSWORD_AUTH_DISABLED"
+  });
+}
+
+function configuredDemoAccounts(): DemoAccount[] {
+  const accounts: DemoAccount[] = [];
+  const clientPhone = env.APP_REVIEW_DEMO_CLIENT_PHONE;
+  const clientPassword = env.APP_REVIEW_DEMO_CLIENT_PASSWORD;
+  const workerPhone = env.APP_REVIEW_DEMO_WORKER_PHONE;
+  const workerPassword = env.APP_REVIEW_DEMO_WORKER_PASSWORD;
+
+  if (clientPhone && clientPassword) {
+    accounts.push({
+      phone: normalizePhone(clientPhone),
+      password: clientPassword,
+      role: UserRole.CLIENT
+    });
+  }
+
+  if (workerPhone && workerPassword) {
+    accounts.push({
+      phone: normalizePhone(workerPhone),
+      password: workerPassword,
+      role: UserRole.PROVIDER
+    });
+  }
+
+  return accounts;
+}
+
+function findDemoAccount(phone: string) {
+  if (!env.APP_REVIEW_DEMO_ENABLED) return null;
+  const normalizedPhone = normalizePhone(phone);
+  return configuredDemoAccounts().find((account) => account.phone === normalizedPhone) || null;
+}
+
+export function isAppReviewDemoPhone(phone: string) {
+  return Boolean(findDemoAccount(phone));
 }
 
 type UserWithPermissions = {
@@ -100,13 +274,6 @@ function phoneAlreadyRegisteredError() {
   });
 }
 
-function invalidCredentialsError() {
-  return Object.assign(new Error("Invalid phone or password"), {
-    status: 401,
-    code: "INVALID_CREDENTIALS"
-  });
-}
-
 async function deliverOtp(
   phone: string,
   purpose: OtpPurpose,
@@ -169,51 +336,36 @@ export async function requestLegacyOtp(
   return authTimingResponse(service);
 }
 
-export async function registerWithOtp(
-  input: { phone: string; code: string; password: string },
+export async function requestAuthOtp(
+  input: { phone: string; purpose?: OtpRequestPurpose },
+  authProvider: AuthProvider = defaultAuthProvider,
   service: OtpService = otpService
 ) {
+  const purpose = input.purpose || "AUTH";
   const phone = normalizePhone(input.phone);
-  const existingUser = await prisma.user.findUnique({
-    where: { phone },
-    select: { id: true }
-  });
 
-  if (existingUser) {
-    throw phoneAlreadyRegisteredError();
+  if (purpose !== "AUTH") {
+    throw passwordAuthDisabledError();
   }
 
-  const passwordHash = await hashPassword(input.password);
-  await service.verifyChallenge(phone, OtpPurpose.REGISTER, input.code);
-
-  let user: UserWithPermissions;
-  try {
-    user = await prisma.user.create({
-      data: {
-        phone,
-        passwordHash,
-        passwordSetAt: new Date(),
-        role: UserRole.CLIENT
-      },
-      include: {
-        adminPermissions: true
-      }
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw phoneAlreadyRegisteredError();
-    }
-    throw error;
+  if (purpose === "AUTH" && isAppReviewDemoPhone(phone)) {
+    return {
+      ok: true,
+      success: true,
+      nextStep: "APP_REVIEW_PASSWORD_REQUIRED"
+    };
   }
 
-  return createSessionForUser(user);
+  return requestLegacyOtp({ phone }, authProvider, service);
 }
 
-export async function authenticateWithLegacyOtp(
-  input: { phone: string; code: string },
-  service: OtpService = otpService
-) {
+export async function verifyAuthOtp(input: { phone: string; code: string; purpose?: OtpRequestPurpose }, service: OtpService = otpService) {
   const phone = normalizePhone(input.phone);
+  const purpose = input.purpose || "AUTH";
+
+  if (purpose === "PASSWORD_RESET") {
+    throw passwordAuthDisabledError();
+  }
 
   await service.verifyChallenge(phone, OtpPurpose.REGISTER, input.code);
 
@@ -223,6 +375,13 @@ export async function authenticateWithLegacyOtp(
       adminPermissions: true
     }
   });
+
+  if (user?.status === UserStatus.BLOCKED) {
+    throw Object.assign(new Error("User account is blocked"), {
+      status: 403,
+      code: "USER_BLOCKED"
+    });
+  }
 
   if (!user) {
     try {
@@ -252,8 +411,33 @@ export async function authenticateWithLegacyOtp(
   return createSessionForUser(user);
 }
 
-export async function loginWithPassword(input: { phone: string; password: string }) {
-  const phone = normalizePhone(input.phone);
+export async function loginWithAppReviewDemo(input: { phone: string; password: string }) {
+  const demoAccount = findDemoAccount(input.phone);
+  if (!env.APP_REVIEW_DEMO_ENABLED) throw demoModeDisabledError();
+  if (!demoAccount || !secureEqual(input.password, demoAccount.password)) throw invalidDemoCredentialsError();
+
+  const user = await prisma.user.findUnique({
+    where: {
+      phone: demoAccount.phone
+    },
+    include: {
+      adminPermissions: true
+    }
+  });
+
+  if (!user || user.role !== demoAccount.role || user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN) {
+    throw invalidDemoCredentialsError();
+  }
+
+  return createSessionForUser(user);
+}
+
+export async function loginWithPassword(input: { otpSessionToken: string; password: string }) {
+  const otpSession = await findValidOtpSession(input.otpSessionToken, {
+    purpose: "AUTH",
+    nextStep: "PASSWORD_REQUIRED"
+  });
+  const phone = normalizePhone(otpSession.phone);
   const user = await prisma.user.findUnique({
     where: { phone },
     include: {
@@ -264,7 +448,106 @@ export async function loginWithPassword(input: { phone: string; password: string
   const passwordMatches = await verifyPassword(input.password, user?.passwordHash);
 
   if (!user || !user.passwordHash || !passwordMatches) {
-    throw invalidCredentialsError();
+    throw Object.assign(new Error("Invalid password"), {
+      status: 401,
+      code: "INVALID_PASSWORD"
+    });
+  }
+
+  if (otpSession.userId && user.id !== otpSession.userId) {
+    throw otpSessionError("OTP session is invalid");
+  }
+
+  await consumeOtpSession(otpSession.id);
+
+  return createSessionForUser(user);
+}
+
+export async function setupPasswordAfterOtp(input: {
+  otpSessionToken: string;
+  password: string;
+  confirmPassword: string;
+}) {
+  assertPasswordInput(input.password, input.confirmPassword);
+
+  const otpSession = await findValidOtpSession(input.otpSessionToken, {
+    purpose: "AUTH",
+    nextStep: "PASSWORD_SETUP_REQUIRED"
+  });
+  const phone = normalizePhone(otpSession.phone);
+  const passwordHash = await hashPassword(input.password);
+  const now = new Date();
+
+  const existingUser = await prisma.user.findUnique({
+    where: { phone },
+    select: {
+      id: true,
+      status: true,
+      passwordHash: true
+    }
+  });
+
+  if (
+    existingUser?.status === UserStatus.BLOCKED ||
+    existingUser?.passwordHash ||
+    (otpSession.userId && existingUser?.id !== otpSession.userId)
+  ) {
+    throw otpSessionError("OTP session is invalid");
+  }
+
+  let user: UserWithPermissions;
+  await consumeOtpSession(otpSession.id);
+
+  if (existingUser) {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          passwordHash,
+          passwordSetAt: now,
+          passwordChangedAt: now,
+          sessionVersion: {
+            increment: 1
+          }
+        }
+      }),
+      prisma.session.updateMany({
+        where: {
+          userId: existingUser.id,
+          revoked: false
+        },
+        data: {
+          revoked: true
+        }
+      })
+    ]);
+
+    user = await prisma.user.findUniqueOrThrow({
+      where: { id: existingUser.id },
+      include: {
+        adminPermissions: true
+      }
+    });
+  } else {
+    try {
+      user = await prisma.user.create({
+        data: {
+          phone,
+          passwordHash,
+          passwordSetAt: now,
+          passwordChangedAt: now,
+          role: UserRole.CLIENT
+        },
+        include: {
+          adminPermissions: true
+        }
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw otpSessionError("OTP session is invalid");
+      }
+      throw error;
+    }
   }
 
   return createSessionForUser(user);
@@ -295,36 +578,41 @@ export async function requestForgotPasswordOtp(
   return authTimingResponse(service);
 }
 
-export async function resetPasswordWithOtp(
-  input: { phone: string; code: string; newPassword: string },
-  service: OtpService = otpService
-) {
-  const phone = normalizePhone(input.phone);
-  const passwordHash = await hashPassword(input.newPassword);
+export async function resetPasswordAfterOtp(input: {
+  otpSessionToken: string;
+  password: string;
+  confirmPassword: string;
+}) {
+  assertPasswordInput(input.password, input.confirmPassword);
 
-  await service.verifyChallenge(phone, OtpPurpose.PASSWORD_RESET, input.code);
+  const otpSession = await findValidOtpSession(input.otpSessionToken, {
+    purpose: "PASSWORD_RESET",
+    nextStep: "PASSWORD_RESET_REQUIRED"
+  });
+  const passwordHash = await hashPassword(input.password);
+  const now = new Date();
 
   const user = await prisma.user.findUnique({
-    where: { phone },
+    where: { phone: normalizePhone(otpSession.phone) },
     select: {
       id: true,
       status: true
     }
   });
 
-  if (!user || user.status !== UserStatus.ACTIVE) {
-    throw Object.assign(new Error("Password reset challenge is invalid"), {
-      status: 401,
-      code: "OTP_INVALID"
-    });
+  if (!user || user.status !== UserStatus.ACTIVE || (otpSession.userId && user.id !== otpSession.userId)) {
+    throw otpSessionError("OTP session is invalid");
   }
+
+  await consumeOtpSession(otpSession.id);
 
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
-        passwordSetAt: new Date(),
+        passwordSetAt: now,
+        passwordChangedAt: now,
         sessionVersion: {
           increment: 1
         }
@@ -341,10 +629,14 @@ export async function resetPasswordWithOtp(
     })
   ]);
 
-  return {
-    ok: true,
-    passwordUpdated: true
-  };
+  const updatedUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    include: {
+      adminPermissions: true
+    }
+  });
+
+  return createSessionForUser(updatedUser);
 }
 
 

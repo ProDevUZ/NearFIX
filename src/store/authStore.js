@@ -3,12 +3,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
   deleteCurrentUserApi,
+  loginWithAppReviewDemo,
   loginWithPassword as loginWithPasswordApi,
   logoutApi,
   getCurrentUserApi,
   refreshAccessTokenApi,
-  verifyRegisterOtp,
-  updateCurrentUserApi
+  resetPassword as resetPasswordApi,
+  setupPassword as setupPasswordApi,
+  updateCurrentUserApi,
+  verifyAuthOtp
 } from "../services/auth";
 
 const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
@@ -25,6 +28,15 @@ function toSession(apiResult, user = apiResult.user) {
   };
 }
 
+function storeSessionResult(set, apiResult) {
+  set({
+    session: toSession(apiResult),
+    invalidation: null
+  });
+
+  return { ok: true, role: apiResult.user.role, source: "api" };
+}
+
 export const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -32,27 +44,35 @@ export const useAuthStore = create(
   invalidation: null,
   hasHydrated: false,
   setHasHydrated: (value) => set({ hasHydrated: value }),
-  login: async (phone, password) => {
-    const apiResult = await loginWithPasswordApi(phone || "+998", password);
+  verifyOtpAndLogin: async (phone, code, purpose = "AUTH") => {
+    const apiResult = await verifyAuthOtp(phone, code, purpose);
     if (!apiResult.ok) return apiResult;
 
-    set({
-      session: toSession(apiResult),
-      invalidation: null
-    });
-
-    return { ok: true, role: apiResult.user.role, source: "api" };
+    return storeSessionResult(set, apiResult);
   },
-  register: async (phone, code, password) => {
-    const apiResult = await verifyRegisterOtp(phone || "+998", code, password);
+  loginWithDemoPassword: async (phone, password) => {
+    const apiResult = await loginWithAppReviewDemo(phone, password);
     if (!apiResult.ok) return apiResult;
 
-    set({
-      session: toSession(apiResult),
-      invalidation: null
-    });
+    return storeSessionResult(set, apiResult);
+  },
+  login: async (otpSessionToken, password) => {
+    const apiResult = await loginWithPasswordApi(otpSessionToken, password);
+    if (!apiResult.ok) return apiResult;
 
-    return { ok: true, role: apiResult.user.role, source: "api" };
+    return storeSessionResult(set, apiResult);
+  },
+  setupPassword: async (otpSessionToken, password, confirmPassword) => {
+    const apiResult = await setupPasswordApi(otpSessionToken, password, confirmPassword);
+    if (!apiResult.ok) return apiResult;
+
+    return storeSessionResult(set, apiResult);
+  },
+  resetPassword: async (otpSessionToken, password, confirmPassword) => {
+    const apiResult = await resetPasswordApi(otpSessionToken, password, confirmPassword);
+    if (!apiResult.ok) return apiResult;
+
+    return storeSessionResult(set, apiResult);
   },
   updateProfile: async (profile) => {
     const current = get().session;

@@ -140,7 +140,7 @@ export function WorkerProfileManageScreen({ navigation }) {
     }
 
     if (!name.trim()) {
-      Alert.alert("Ism familiya kerak", "Admin tekshiruvi uchun ismingizni kiriting.");
+      Alert.alert("Ism kerak", "Admin tekshiruvi uchun ismingizni kiriting.");
       return;
     }
 
@@ -311,7 +311,7 @@ export function WorkerProfileManageScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <Field label="Ism familiya" value={name} onChangeText={setName} placeholder="Masalan: Ism Familiya" />
+        <Field label="Ism" value={name} onChangeText={setName} placeholder="Masalan: Ism" />
         <Text style={styles.inputLabel}>Shahar</Text>
         <View style={styles.cityGrid}>
           {CITIES.map((city) => {
