@@ -9,6 +9,7 @@ import { createAddressApi, deleteAddressApi, getAddressesApi, updateAddressApi }
 import { fetchBannersApi } from "../services/content/bannerService";
 import { addFavoriteApi, fetchFavoritesApi, removeFavoriteApi } from "../services/favorites/favoriteService";
 import { useAuthStore } from "./authStore";
+import { registerSessionResetHandler } from "./sessionReset";
 
 const initialUser = {
   id: null,
@@ -436,3 +437,5 @@ export const useClientStore = create((set, get) => ({
     return result;
   }
 }));
+
+registerSessionResetHandler(() => useClientStore.getState().clearUserData());

@@ -14,6 +14,7 @@ import {
   updateOrderStatusApi
 } from "../services/workers/workerService";
 import { useAuthStore } from "./authStore";
+import { registerSessionResetHandler } from "./sessionReset";
 
 const activeWorkerStatuses = [
   TRACKING_STATUSES.ACCEPTED,
@@ -298,3 +299,5 @@ export const useWorkerStore = create((set, get) => ({
     return { ok: false, message: "Faol ish topilmadi." };
   }
 }));
+
+registerSessionResetHandler(() => useWorkerStore.getState().clearUserData());

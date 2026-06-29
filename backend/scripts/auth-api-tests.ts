@@ -132,6 +132,15 @@ async function main() {
     return { response, payload };
   }
 
+  async function del(path: string, token?: string) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  }
+
   try {
     const normalRequest = await post("/auth/otp/request", { phone });
     assert.equal(normalRequest.response.status, 202);
@@ -198,12 +207,20 @@ async function main() {
     assert.equal(demoMe.payload.user.phone, demoClientPhone);
     assert.equal(demoMe.payload.user.role, "client");
 
+    const demoDelete = await del("/auth/me", demoLogin.payload.accessToken);
+    assert.equal(demoDelete.response.status, 403);
+    assert.equal(demoDelete.payload.code, "DEMO_ACCOUNT_PROTECTED");
+
     const workerDemoLogin = await post("/auth/app-review/login", {
       phone: demoWorkerPhone,
       password: "DemoWorker-123"
     });
     assert.equal(workerDemoLogin.response.status, 200);
     assert.equal(workerDemoLogin.payload.user.role, "provider");
+
+    const workerDemoDelete = await del("/auth/me", workerDemoLogin.payload.accessToken);
+    assert.equal(workerDemoDelete.response.status, 403);
+    assert.equal(workerDemoDelete.payload.code, "DEMO_ACCOUNT_PROTECTED");
 
     const wrongDemoPassword = await post("/auth/app-review/login", {
       phone: demoClientPhone,

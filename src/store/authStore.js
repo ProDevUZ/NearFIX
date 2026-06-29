@@ -13,6 +13,7 @@ import {
   updateCurrentUserApi,
   verifyAuthOtp
 } from "../services/auth";
+import { resetRoleStores } from "./sessionReset";
 
 const PUSH_TOKEN_STORAGE_KEY = "nearfix-push-token";
 
@@ -29,6 +30,8 @@ function toSession(apiResult, user = apiResult.user) {
 }
 
 function storeSessionResult(set, apiResult) {
+  resetRoleStores();
+
   set({
     session: toSession(apiResult),
     invalidation: null
@@ -101,6 +104,13 @@ export const useAuthStore = create(
       const refreshResult = await refreshAccessTokenApi(current.refreshToken);
 
       if (refreshResult.ok) {
+        if (
+          current.userId !== refreshResult.user.id ||
+          current.role !== refreshResult.user.role
+        ) {
+          resetRoleStores();
+        }
+
         set({
           session: {
             ...current,
@@ -116,6 +126,7 @@ export const useAuthStore = create(
       }
 
       if (refreshResult.code === "REFRESH_SESSION_INVALID") {
+        resetRoleStores();
         set({
           session: null,
           invalidation: {
@@ -131,6 +142,13 @@ export const useAuthStore = create(
 
     const result = await getCurrentUserApi(current.token);
     if (result.ok) {
+      if (
+        current.userId !== result.user.id ||
+        current.role !== result.user.role
+      ) {
+        resetRoleStores();
+      }
+
       set({
         session: {
           ...current,
@@ -145,6 +163,7 @@ export const useAuthStore = create(
     }
 
     if (result.code === "SESSION_VERSION_MISMATCH" || result.code === "SESSION_INVALID") {
+      resetRoleStores();
       set({
         session: null,
         invalidation: {
@@ -165,6 +184,7 @@ export const useAuthStore = create(
       if (pushToken) await AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
     }
 
+    resetRoleStores();
     set({
       session: null
     });
@@ -177,6 +197,7 @@ export const useAuthStore = create(
     if (!result.ok) return result;
 
     await AsyncStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+    resetRoleStores();
     set({
       session: null,
       invalidation: null
@@ -186,6 +207,7 @@ export const useAuthStore = create(
   },
   invalidateSessionForRoleChange: (nextRole) => {
     const current = get().session;
+    resetRoleStores();
     set({
       session: null,
       invalidation: {

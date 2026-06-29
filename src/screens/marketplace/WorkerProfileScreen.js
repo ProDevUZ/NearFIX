@@ -68,6 +68,7 @@ export function WorkerProfileScreen({ navigation }) {
   const isFavorite = favoriteWorkerIds.includes(worker.id);
   const heroImage = resolveWorkerImage(worker);
   const isBookable = worker.availability === WORKER_STATUS.AVAILABLE;
+  const reviewCount = reviews.length || Number(worker.reviews || 0);
 
   async function handleChat() {
     if (openingChat) return;
@@ -112,13 +113,11 @@ export function WorkerProfileScreen({ navigation }) {
   }
 
   async function handleShare() {
-    const workerUrl = `https://nearfix.uz/workers/${worker.id}`;
     const title = `${worker.name} - ${worker.specialty}`;
 
     await Share.share({
       title,
-      url: workerUrl,
-      message: `${title}\nNearFIX orqali ko'rish: ${workerUrl}`
+      message: `${title}\nNearFIX ilovasida ko'ring.`
     });
   }
 
@@ -176,9 +175,6 @@ export function WorkerProfileScreen({ navigation }) {
 
           <View style={styles.heroInfo}>
             <View style={styles.badgeRow}>
-              <View style={styles.topBadge}>
-                <Text style={styles.topBadgeText}>TOP USTA</Text>
-              </View>
               <View style={styles.onlineBadge}>
                 <View style={styles.onlineDot} />
                 <Text style={styles.onlineText}>{isBookable ? "Onlayn" : "Mavjud emas"}</Text>
@@ -191,7 +187,11 @@ export function WorkerProfileScreen({ navigation }) {
 
         <View style={styles.statsCard}>
           <View style={styles.statsRow}>
-            <StatItem icon={<Star size={21} color="#FFB020" fill="#FFB020" />} value={worker.rating} label={`${worker.reviews || 124} ta sharh`} />
+            <StatItem
+              icon={<Star size={21} color="#FFB020" fill="#FFB020" />}
+              value={reviewCount ? worker.rating : "-"}
+              label={reviewCount ? `${reviewCount} ta sharh` : "Sharhlar hali yo'q"}
+            />
             <View style={styles.divider} />
             <StatItem icon={<BadgeCheck size={21} color="#0F80B7" fill="#0F80B7" />} value={`${worker.completedOrders || 0}+`} label="Bajarilgan ishlar" />
             <View style={styles.divider} />
@@ -207,7 +207,7 @@ export function WorkerProfileScreen({ navigation }) {
                 {isBookable ? "Bugun bo'sh vaqtlari bor" : "Hozir buyurtma qabul qilmayapti"}
               </Text>
               <Text style={styles.availableText}>
-                {isBookable ? "Eng yaqin vaqt: 14:00" : "Boshqa mavjud ustani tanlang"}
+                {isBookable ? "Buyurtma berish mumkin" : "Boshqa mavjud ustani tanlang"}
               </Text>
             </View>
           </View>

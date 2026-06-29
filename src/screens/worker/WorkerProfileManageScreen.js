@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Bell, Camera, CheckCircle2, Clock3, FileText, LogOut, Shield, ShieldCheck, Trash2, UserRound } from "lucide-react-native";
+import { Bell, Camera, CheckCircle2, CircleHelp, FileText, LogOut, Shield, ShieldCheck, Trash2, UserRound } from "lucide-react-native";
 import { CITIES } from "../../constants/catalog";
 import { ROUTES } from "../../constants/routes";
 import { uploadMediaApi } from "../../services/media/mediaService";
@@ -14,10 +14,60 @@ import { openPrivacyPolicy, openTerms } from "../../utils/legalLinks";
 
 const serviceOptions = ["Santexnik", "Elektrik", "Payvandchi", "Usta", "Konditsioner", "Ta'mirlash", "Tozalash"];
 
+function getInitials(value) {
+  return String(value || "NF")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function getStatusMeta(status) {
+  switch (status) {
+    case "approved":
+      return {
+        label: "Tasdiqlangan",
+        title: "Profil tasdiqlangan",
+        text: "Siz katalogda ko'rinasiz va buyurtma qabul qilishingiz mumkin.",
+        color: colors.success
+      };
+    case "rejected":
+      return {
+        label: "Rad etilgan",
+        title: "Profil rad etilgan",
+        text: "Qo'llab-quvvatlash jamoasi bilan bog'laning.",
+        color: colors.danger
+      };
+    case "submitted":
+    case "pending":
+    case "review":
+      return {
+        label: "Tekshiruvda",
+        title: "Tekshiruv kutilmoqda",
+        text: "Ma'lumotlaringiz ko'rib chiqilgandan keyin profil katalogda ko'rinadi.",
+        color: "#F59E0B"
+      };
+    default:
+      return {
+        label: "To'ldirilmoqda",
+        title: "Profil to'ldirilmoqda",
+        text: "Admin tekshiruvi uchun kerakli ma'lumotlarni kiriting.",
+        color: "#F59E0B"
+      };
+  }
+}
+
+function cityName(cityId) {
+  return CITIES.find((city) => city.id === cityId)?.name || "Shahar tanlanmagan";
+}
+
 export function WorkerProfileManageScreen({ navigation }) {
   const token = useAuthStore((state) => state.session?.token);
   const logout = useAuthStore((state) => state.logout);
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
+  const sessionPhone = useAuthStore((state) => state.session?.phone);
   const worker = useWorkerStore((state) => state.workerProfile);
   const syncWorkerFromApi = useWorkerStore((state) => state.syncWorkerFromApi);
   const submitWorkerProfile = useWorkerStore((state) => state.submitWorkerProfile);
@@ -35,6 +85,10 @@ export function WorkerProfileManageScreen({ navigation }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const isApproved = worker?.status === "approved";
+  const statusMeta = useMemo(() => getStatusMeta(worker?.status), [worker?.status]);
+  const servicesText = selectedServices.length ? selectedServices.join(", ") : "Soha tanlanmagan";
+  const priceText = basePrice ? `${Number(basePrice || 0).toLocaleString("uz-UZ")} so'm` : "Narx kiritilmagan";
+  const phone = worker?.phone || sessionPhone || "Telefon kiritilmagan";
 
   useEffect(() => {
     syncWorkerFromApi();
@@ -66,23 +120,9 @@ export function WorkerProfileManageScreen({ navigation }) {
     setSelectedServices(worker?.professions || [worker?.specialty].filter(Boolean));
   }, [worker?.about, worker?.basePriceValue, worker?.cityId, worker?.experienceYears, worker?.name, worker?.profileImageUrl, worker?.professions, worker?.specialty]);
 
-  const statusCopy = useMemo(() => {
-    if (isApproved) {
-      return {
-        title: "Profil tasdiqlangan",
-        text: "Siz katalogda ko'rinasiz va buyurtma qabul qilishingiz mumkin.",
-        color: colors.success
-      };
-    }
-
-    return {
-      title: "Yangi - admin tasdig'i kutilmoqda",
-      text: "Ma'lumotlarni to'ldiring. Admin ko'rib chiqqandan keyin siz haqiqiy ustalar ro'yxatiga qo'shilasiz.",
-      color: "#F59E0B"
-    };
-  }, [isApproved]);
-
   function toggleService(service) {
+    if (isApproved) return;
+
     setSelectedServices((current) =>
       current.includes(service)
         ? current.filter((item) => item !== service)
@@ -91,6 +131,8 @@ export function WorkerProfileManageScreen({ navigation }) {
   }
 
   async function handlePickImage() {
+    if (isApproved) return;
+
     if (!token) {
       Alert.alert("Tizimga kiring", "Rasm yuklash uchun qayta tizimga kiring.");
       return;
@@ -135,7 +177,7 @@ export function WorkerProfileManageScreen({ navigation }) {
 
   async function handleSubmit() {
     if (isApproved) {
-      Alert.alert("Profil tasdiqlangan", "Profilingiz admin tomonidan tasdiqlangan.");
+      Alert.alert("Profil tasdiqlangan", "Ma'lumotlarni o'zgartirish uchun qo'llab-quvvatlashga murojaat qiling.");
       return;
     }
 
@@ -170,7 +212,7 @@ export function WorkerProfileManageScreen({ navigation }) {
     }
 
     if (!bio.trim()) {
-      Alert.alert("Bio kerak", "O'zingiz haqingizda qisqa ma'lumot kiriting.");
+      Alert.alert("Tavsif kerak", "O'zingiz haqingizda qisqa ma'lumot kiriting.");
       return;
     }
 
@@ -209,7 +251,7 @@ export function WorkerProfileManageScreen({ navigation }) {
     if (deletingAccount) return;
 
     Alert.alert(
-      "Hisobni o'chirish",
+      "Akkauntni o'chirish",
       "Usta profilingiz katalogdan olib tashlanadi, shaxsiy ma'lumotlar anonimlashtiriladi va barcha sessiyalar yopiladi. Buyurtma va chat tarixi anonim ko'rinishda saqlanishi mumkin.",
       [
         { text: "Bekor qilish", style: "cancel" },
@@ -217,10 +259,10 @@ export function WorkerProfileManageScreen({ navigation }) {
           text: "Davom etish",
           style: "destructive",
           onPress: () => {
-            Alert.alert("Qayta tiklab bo'lmaydi", "Hisobni o'chirishni aniq tasdiqlaysizmi?", [
+            Alert.alert("Qayta tiklab bo'lmaydi", "Akkauntni o'chirishni aniq tasdiqlaysizmi?", [
               { text: "Yo'q", style: "cancel" },
               {
-                text: "Hisobni o'chirish",
+                text: "Akkauntni o'chirish",
                 style: "destructive",
                 onPress: handleDeleteAccount
               }
@@ -237,12 +279,17 @@ export function WorkerProfileManageScreen({ navigation }) {
 
     if (!result.ok) {
       setDeletingAccount(false);
-      Alert.alert("Hisob o'chirilmadi", result.message || "Qayta urinib ko'ring.");
+      Alert.alert(
+        "Akkaunt o'chirilmadi",
+        result.code === "DEMO_ACCOUNT_PROTECTED"
+          ? "Demo akkauntni o'chirib bo'lmaydi. Bu akkaunt App Store tekshiruvi uchun saqlanadi."
+          : result.message || "Qayta urinib ko'ring."
+      );
       return;
     }
 
     clearUserData();
-    Alert.alert("Hisob o'chirildi", "Shaxsiy ma'lumotlaringiz anonimlashtirildi.");
+    Alert.alert("Akkaunt o'chirildi", "Shaxsiy ma'lumotlaringiz anonimlashtirildi.");
   }
 
   async function handleRefresh() {
@@ -252,149 +299,179 @@ export function WorkerProfileManageScreen({ navigation }) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#0F80B7" colors={["#0F80B7"]} />}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerTitleBlock}>
-            <Text style={styles.eyebrow}>Profil sozlamalari</Text>
-            <Text style={styles.title}>Usta profili</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable style={styles.iconButton} onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}>
-              <Bell size={21} color={colors.text} strokeWidth={2.7} />
-              {unreadNotifications > 0 ? (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-              <LogOut size={22} color={colors.danger} strokeWidth={2.7} />
-            </Pressable>
-          </View>
-        </View>
-        <Text style={styles.subtitle}>Tasdiqdan oldin kerakli ma'lumotlarni to'ldiring</Text>
-      </View>
-
-      <View style={[styles.statusCard, { borderColor: statusCopy.color }]}>
-        <Clock3 size={20} color={statusCopy.color} strokeWidth={2.7} />
-        <View style={styles.flex}>
-          <Text style={styles.statusTitle}>{statusCopy.title}</Text>
-          <Text style={styles.statusText}>{statusCopy.text}</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Shaxsiy ma'lumot</Text>
-          <Text style={styles.cardMeta}>1/3</Text>
-        </View>
-        <View style={styles.avatarRow}>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#0F80B7" colors={["#0F80B7"]} />}
+      >
+        <View style={styles.headerCard}>
           <View style={styles.avatar}>
             {profileImageUrl ? (
               <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
             ) : (
-              <UserRound size={30} color={colors.white} strokeWidth={2.6} />
+              <Text style={styles.avatarInitials}>{getInitials(name || phone)}</Text>
             )}
           </View>
-          <View style={styles.flex}>
-            <Text style={styles.inputLabel}>Profil rasmi</Text>
-            <Pressable onPress={handlePickImage} disabled={uploadingImage} style={[styles.uploadButton, uploadingImage && styles.submitButtonMuted]}>
-              <Text style={styles.uploadText}>{uploadingImage ? "Yuklanmoqda..." : profileImageUrl ? "Rasmni almashtirish" : "Rasm yuklash"}</Text>
-            </Pressable>
+          <View style={styles.headerBody}>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusMeta.color}18` }]}>
+              <Text style={[styles.statusBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
+            </View>
+            <Text style={styles.profileName} numberOfLines={1}>{name || "Usta profili"}</Text>
+            <Text style={styles.profilePhone} numberOfLines={1}>{phone}</Text>
           </View>
-          <Pressable onPress={handlePickImage} disabled={uploadingImage} style={styles.cameraButton}>
-            <Camera size={20} color={colors.primary} strokeWidth={2.6} />
+          <Pressable style={styles.notificationButton} onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} hitSlop={8}>
+            <Bell size={21} color={colors.text} strokeWidth={2.7} />
+            {unreadNotifications > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
 
-        <Field label="Ism" value={name} onChangeText={setName} placeholder="Masalan: Ism" />
-        <Text style={styles.inputLabel}>Shahar</Text>
-        <View style={styles.cityGrid}>
-          {CITIES.map((city) => {
-            const active = city.id === cityId;
-            return (
-              <Pressable key={city.id} onPress={() => setCityId(city.id)} style={[styles.cityChip, active && styles.cityChipActive]}>
-                <Text style={[styles.cityChipText, active && styles.cityChipTextActive]}>{city.name}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={[styles.statusCard, { borderColor: statusMeta.color }]}>
+          <ShieldCheck size={20} color={statusMeta.color} strokeWidth={2.6} />
+          <View style={styles.flex}>
+            <Text style={styles.statusTitle}>{statusMeta.title}</Text>
+            <Text style={styles.statusText}>{statusMeta.text}</Text>
+          </View>
         </View>
-        <Field label="Tajriba" value={experienceYears} onChangeText={setExperienceYears} placeholder="8" keyboardType="number-pad" />
-      </View>
 
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Xizmat sohalari</Text>
-          <Text style={styles.cardMeta}>2/3</Text>
+        {isApproved ? (
+          <View style={styles.readOnlyNotice}>
+            <ShieldCheck size={20} color={colors.primary} strokeWidth={2.6} />
+            <Text style={styles.readOnlyNoticeText}>
+              Profilingiz tasdiqlangan. Ma'lumotlarni o'zgartirish uchun qo'llab-quvvatlashga murojaat qiling.
+            </Text>
+          </View>
+        ) : null}
+
+        <SectionCard title="Profil rasmi">
+          <View style={styles.photoRow}>
+            <View style={styles.photoPreview}>
+              {profileImageUrl ? (
+                <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <UserRound size={28} color={colors.white} strokeWidth={2.6} />
+              )}
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.photoTitle}>{profileImageUrl ? "Rasm yuklangan" : "Rasm yuklanmagan"}</Text>
+              <Text style={styles.photoText}>
+                {isApproved ? "Tasdiqlangan profilda rasmni o'zgartirish uchun yordamga murojaat qiling." : "Admin tekshiruvi uchun aniq profil rasmi kerak."}
+              </Text>
+              {!isApproved ? (
+                <Pressable onPress={handlePickImage} disabled={uploadingImage} style={[styles.secondaryButton, uploadingImage && styles.controlDisabled]}>
+                  <Camera size={17} color={colors.primary} strokeWidth={2.6} />
+                  <Text style={styles.secondaryButtonText}>{uploadingImage ? "Yuklanmoqda..." : profileImageUrl ? "Rasmni almashtirish" : "Rasm yuklash"}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        </SectionCard>
+
+        <SectionCard title="Profil ma'lumotlari">
+          <Field label="Ism" value={name} onChangeText={setName} placeholder="Masalan: Ism" editable={!isApproved} />
+
+          <Text style={styles.inputLabel}>Shahar</Text>
+          {isApproved ? (
+            <ReadOnlyValue value={cityName(cityId)} />
+          ) : (
+            <View style={styles.chips}>
+              {CITIES.map((city) => {
+                const active = city.id === cityId;
+                return (
+                  <Pressable key={city.id} onPress={() => setCityId(city.id)} style={[styles.chip, active && styles.chipActive]}>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{city.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          <Text style={styles.inputLabel}>Xizmat sohalari</Text>
+          {isApproved ? (
+            <ReadOnlyValue value={servicesText} />
+          ) : (
+            <View style={styles.chips}>
+              {serviceOptions.map((service) => {
+                const active = selectedServices.includes(service);
+                return (
+                  <Pressable key={service} onPress={() => toggleService(service)} style={[styles.chip, active && styles.chipActive]}>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{service}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          <Field label="Tajriba" value={experienceYears} onChangeText={setExperienceYears} placeholder="8" keyboardType="number-pad" editable={!isApproved} />
+          <Field label="Boshlang'ich narx" value={basePrice} onChangeText={setBasePrice} placeholder="100000" keyboardType="number-pad" editable={!isApproved} helper={isApproved ? priceText : undefined} />
+
+          <Text style={styles.inputLabel}>Tavsif</Text>
+          <TextInput
+            editable={!isApproved}
+            multiline
+            value={bio}
+            onChangeText={setBio}
+            placeholder="Tajriba, ish uslubi va kafolat haqida qisqa yozing"
+            placeholderTextColor={colors.subtle}
+            style={[styles.input, styles.textArea, isApproved && styles.inputDisabled]}
+          />
+        </SectionCard>
+
+        <SectionCard title="Qo'llab-quvvatlash va huquqiy ma'lumotlar">
+          <ProfileAction icon={CircleHelp} label="Qo'llab-quvvatlash" onPress={() => navigation.navigate(ROUTES.WORKER_SUPPORT_TAB)} />
+          <ProfileAction icon={Shield} label="Maxfiylik siyosati" onPress={openPrivacyPolicy} />
+          <ProfileAction icon={FileText} label="Foydalanish shartlari" onPress={openTerms} />
+        </SectionCard>
+
+        <View style={styles.dangerCard}>
+          <Text style={styles.dangerTitle}>Xavfli amallar</Text>
+          <ProfileAction danger icon={LogOut} label="Chiqish" onPress={handleLogout} />
+          <ProfileAction
+            danger
+            icon={Trash2}
+            label={deletingAccount ? "Akkaunt o'chirilmoqda..." : "Akkauntni o'chirish"}
+            onPress={confirmDeleteAccount}
+          />
         </View>
-        <Text style={styles.helperText}>Bitta yoki bir nechta soha tanlash mumkin.</Text>
-        <View style={styles.chips}>
-          {serviceOptions.map((service) => {
-            const active = selectedServices.includes(service);
-            return (
-              <Pressable key={service} onPress={() => toggleService(service)} style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{service}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
 
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Ish ma'lumotlari</Text>
-          <Text style={styles.cardMeta}>3/3</Text>
-        </View>
-        <Field label="Boshlang'ich narx" value={basePrice} onChangeText={setBasePrice} placeholder="100000" keyboardType="number-pad" />
-        <Text style={styles.inputLabel}>O'zingiz haqingizda</Text>
-        <TextInput
-          multiline
-          value={bio}
-          onChangeText={setBio}
-          placeholder="Tajriba, ish uslubi va kafolat haqida qisqa yozing"
-          placeholderTextColor={colors.subtle}
-          style={[styles.input, styles.textArea]}
-        />
-      </View>
-
-      <View style={styles.noteCard}>
-        <ShieldCheck size={20} color={colors.primary} strokeWidth={2.6} />
-        <Text style={styles.noteText}>
-          {isApproved ? "Profilingiz tasdiqlangan. Endi mijozlar sizni katalogda ko'radi." : "Admin tasdiqlamaguncha profilingiz mijozlarga ko'rinmaydi."}
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Huquqiy ma'lumotlar va hisob</Text>
-        <ProfileAction icon={Shield} label="Maxfiylik siyosati" onPress={openPrivacyPolicy} />
-        <ProfileAction icon={FileText} label="Foydalanish shartlari" onPress={openTerms} />
-        <ProfileAction
-          danger
-          icon={Trash2}
-          label={deletingAccount ? "Hisob o'chirilmoqda..." : "Hisobni o'chirish"}
-          onPress={confirmDeleteAccount}
-        />
-      </View>
-
-      {isApproved ? null : (
-        <Pressable onPress={handleSubmit} disabled={saving} style={[styles.submitButton, saving && styles.submitButtonMuted]}>
-          <CheckCircle2 size={21} color={colors.white} strokeWidth={2.6} />
-          <Text style={styles.submitText}>{saving ? "Yuborilmoqda..." : "Admin tekshiruviga yuborish"}</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+        {!isApproved ? (
+          <Pressable onPress={handleSubmit} disabled={saving} style={[styles.submitButton, saving && styles.controlDisabled]}>
+            <CheckCircle2 size={21} color={colors.white} strokeWidth={2.6} />
+            <Text style={styles.submitText}>{saving ? "Yuborilmoqda..." : "Admin tekshiruviga yuborish"}</Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function Field({ label, ...props }) {
+function SectionCard({ title, children }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function ReadOnlyValue({ value }) {
+  return (
+    <View style={styles.readOnlyValueBox}>
+      <Text style={styles.readOnlyValueText} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+function Field({ label, editable = true, helper, ...props }) {
   return (
     <View style={styles.field}>
       <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput placeholderTextColor={colors.subtle} style={styles.input} {...props} />
+      <TextInput editable={editable} placeholderTextColor={colors.subtle} style={[styles.input, !editable && styles.inputDisabled]} {...props} />
+      {helper ? <Text style={styles.helperText}>{helper}</Text> : null}
     </View>
   );
 }
@@ -402,53 +479,80 @@ function Field({ label, ...props }) {
 function ProfileAction({ icon: Icon, label, onPress, danger = false }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.profileAction, pressed && styles.profileActionPressed]}>
-      <Icon size={20} color={danger ? colors.danger : colors.primary} strokeWidth={2.5} />
-      <Text style={[styles.profileActionText, danger && styles.profileActionDanger]}>{label}</Text>
+      <View style={[styles.profileActionIcon, danger && styles.profileActionIconDanger]}>
+        <Icon size={20} color={danger ? colors.danger : colors.primary} strokeWidth={2.5} />
+      </View>
+      <Text style={[styles.profileActionText, danger && styles.profileActionDanger]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingTop: 18,
-    paddingHorizontal: 16,
-    paddingBottom: 112,
-    gap: 14,
+  screen: {
+    flex: 1,
     backgroundColor: colors.background
   },
-  header: {
+  content: {
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 112,
+    gap: 14
+  },
+  headerCard: {
     borderRadius: radius.xl,
     backgroundColor: colors.white,
     padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
     ...shadow
   },
-  headerTop: {
-    flexDirection: "row",
+  avatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
+    justifyContent: "center",
+    overflow: "hidden"
   },
-  headerTitleBlock: {
-    flex: 1
+  avatarImage: {
+    width: "100%",
+    height: "100%"
   },
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 12,
+  avatarInitials: {
+    color: colors.white,
+    fontSize: 18,
     fontFamily: "Inter_800ExtraBold"
   },
-  title: {
-    marginTop: 4,
+  headerBody: {
+    flex: 1,
+    minWidth: 0
+  },
+  statusBadge: {
+    alignSelf: "flex-start",
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_800ExtraBold"
+  },
+  profileName: {
+    marginTop: 7,
     color: colors.text,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 22,
+    lineHeight: 27,
     fontFamily: "Inter_800ExtraBold"
   },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
+  profilePhone: {
+    marginTop: 3,
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold"
   },
-  iconButton: {
+  notificationButton: {
     width: 42,
     height: 42,
     borderRadius: 14,
@@ -475,32 +579,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "900"
   },
-  logoutButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: "#FEF2F2",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  subtitle: {
-    marginTop: 8,
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: "Inter_600SemiBold"
-  },
   statusCard: {
     borderWidth: 1,
     borderRadius: radius.xl,
     backgroundColor: colors.white,
     padding: 16,
     flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
     ...shadow
   },
   flex: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   statusTitle: {
     color: colors.text,
@@ -514,71 +605,81 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontFamily: "Inter_600SemiBold"
   },
+  readOnlyNotice: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "#BEE7F3",
+    backgroundColor: "#EAF8FC",
+    padding: 13,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start"
+  },
+  readOnlyNoticeText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: "Inter_700Bold"
+  },
   card: {
     borderRadius: radius.xl,
     backgroundColor: colors.white,
     padding: 16,
-    gap: 14,
+    gap: 13,
     ...shadow
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10
   },
   cardTitle: {
     color: colors.text,
     fontSize: 18,
     fontFamily: "Inter_800ExtraBold"
   },
-  cardMeta: {
-    color: colors.subtle,
-    fontSize: 12,
-    fontFamily: "Inter_800ExtraBold"
-  },
-  avatarRow: {
+  photoRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     padding: 12
   },
-  avatar: {
-    width: 64,
-    height: 64,
+  photoPreview: {
+    width: 62,
+    height: 62,
     borderRadius: 20,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden"
   },
-  avatarImage: {
-    width: "100%",
-    height: "100%"
-  },
-  uploadButton: {
-    minHeight: 40,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    justifyContent: "center"
-  },
-  uploadText: {
-    color: colors.primary,
+  photoTitle: {
+    color: colors.text,
     fontSize: 14,
     fontFamily: "Inter_800ExtraBold"
   },
-  cameraButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
+  photoText: {
+    marginTop: 4,
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "Inter_600SemiBold"
+  },
+  secondaryButton: {
+    alignSelf: "flex-start",
+    marginTop: 10,
+    minHeight: 38,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    gap: 8
+  },
+  secondaryButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontFamily: "Inter_800ExtraBold"
   },
   field: {
     gap: 6
@@ -599,6 +700,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_600SemiBold"
   },
+  inputDisabled: {
+    backgroundColor: "#EEF2F7",
+    color: colors.muted
+  },
+  controlDisabled: {
+    opacity: 0.65
+  },
   textArea: {
     minHeight: 96,
     paddingTop: 12,
@@ -609,37 +717,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold"
   },
+  readOnlyValueBox: {
+    minHeight: 46,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#EEF2F7",
+    paddingHorizontal: 12,
+    justifyContent: "center"
+  },
+  readOnlyValueText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: "Inter_700Bold"
+  },
   chips: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
-  },
-  cityGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  cityChip: {
-    minHeight: 38,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    justifyContent: "center"
-  },
-  cityChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary
-  },
-  cityChipText: {
-    color: colors.muted,
-    fontSize: 13,
-    fontFamily: "Inter_800ExtraBold"
-  },
-  cityChipTextActive: {
-    color: colors.white
   },
   chip: {
     minHeight: 38,
@@ -663,25 +759,12 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: colors.white
   },
-  noteCard: {
-    borderRadius: radius.lg,
-    backgroundColor: "#E6F4F8",
-    padding: 13,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center"
-  },
-  noteText: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: "Inter_700Bold"
-  },
   profileAction: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: radius.md,
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -690,13 +773,38 @@ const styles = StyleSheet.create({
   profileActionPressed: {
     opacity: 0.75
   },
+  profileActionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EAF8FC",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  profileActionIconDanger: {
+    backgroundColor: "#FEECEC"
+  },
   profileActionText: {
+    flex: 1,
     color: colors.text,
     fontSize: 14,
     fontFamily: "Inter_700Bold"
   },
   profileActionDanger: {
     color: colors.danger
+  },
+  dangerCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: colors.white,
+    padding: 16,
+    gap: 13
+  },
+  dangerTitle: {
+    color: "#991B1B",
+    fontSize: 18,
+    fontFamily: "Inter_800ExtraBold"
   },
   submitButton: {
     minHeight: 56,
@@ -706,9 +814,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 8
-  },
-  submitButtonMuted: {
-    opacity: 0.65
   },
   submitText: {
     color: colors.white,

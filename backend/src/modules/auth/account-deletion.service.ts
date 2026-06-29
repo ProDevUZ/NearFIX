@@ -1,8 +1,25 @@
 import { UserRole, UserStatus, WorkerAvailabilityStatus, WorkerProfileStatus } from "@prisma/client";
+import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
 
 function deletedPhone(userId: string) {
   return `deleted+${userId}@nearfix.invalid`;
+}
+
+function normalizePhone(phone: string | null | undefined) {
+  return String(phone || "").replace(/\s+/g, "");
+}
+
+function isProtectedDemoAccount(phone: string | null | undefined) {
+  if (!env.APP_REVIEW_DEMO_ENABLED) return false;
+
+  const normalizedPhone = normalizePhone(phone);
+  const protectedPhones = [
+    env.APP_REVIEW_DEMO_CLIENT_PHONE,
+    env.APP_REVIEW_DEMO_WORKER_PHONE
+  ].map(normalizePhone).filter(Boolean);
+
+  return protectedPhones.includes(normalizedPhone);
 }
 
 export async function deleteCurrentUserAccount(userId: string) {
@@ -18,6 +35,13 @@ export async function deleteCurrentUserAccount(userId: string) {
       throw Object.assign(new Error("User account not found"), {
         status: 404,
         code: "USER_NOT_FOUND"
+      });
+    }
+
+    if (isProtectedDemoAccount(user.phone)) {
+      throw Object.assign(new Error("App Review demo account cannot be deleted"), {
+        status: 403,
+        code: "DEMO_ACCOUNT_PROTECTED"
       });
     }
 
