@@ -125,7 +125,7 @@ export function WorkerProfileScreen({ navigation }) {
     if (!worker.userId || blocking) return;
     Alert.alert(
       "Ustani bloklash",
-      "Yangi chat ochish cheklanadi. Faol buyurtma bo‘lsa, avval yordam orqali hal qilish kerak.",
+      "Yangi chat ochish cheklanadi. Faol buyurtma bo'lsa, avval yordam orqali hal qilish kerak.",
       [
         { text: "Bekor qilish", style: "cancel" },
         {
@@ -135,7 +135,7 @@ export function WorkerProfileScreen({ navigation }) {
             setBlocking(true);
             const result = await blockUserApi(session?.token, worker.userId);
             setBlocking(false);
-            Alert.alert(result.ok ? "Usta bloklandi" : "Bloklab bo‘lmadi", result.ok ? "Bloklangan foydalanuvchilar ro‘yxatidan qayta ochishingiz mumkin." : result.message || "Qayta urinib ko‘ring.");
+            Alert.alert(result.ok ? "Usta bloklandi" : "Bloklab bo'lmadi", result.ok ? "Bloklangan foydalanuvchilar ro'yxatidan qayta ochishingiz mumkin." : result.message || "Qayta urinib ko'ring.");
           }
         }
       ]
@@ -263,7 +263,7 @@ export function WorkerProfileScreen({ navigation }) {
         targetId={reportTarget?.targetId}
         title={reportTarget?.title}
         onClose={() => setReportTarget(null)}
-        onSuccess={() => Alert.alert("Shikoyat yuborildi", "Moderatorlar murojaatingizni ko‘rib chiqadi.")}
+        onSuccess={() => Alert.alert("Shikoyat yuborildi", "Moderatorlar murojaatingizni ko'rib chiqadi.")}
       />
     </View>
   );

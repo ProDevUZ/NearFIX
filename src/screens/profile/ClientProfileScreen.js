@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ban, Bell, CircleHelp, Edit3, FileText, LogOut, MapPin, Plus, Shield, Trash2 } from "lucide-react-native";
 import { ROUTES } from "../../constants/routes";
@@ -536,14 +536,15 @@ function AddressManager({ addresses, loading, error, onAdd, onEdit, onDelete, on
 function AddressFormModal({ visible, draft, saving, mode, onChange, onClose, onPickLocation, onSave }) {
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
-        <Pressable
-          style={styles.modalSheet}
-          onPress={(event) => {
-            event.stopPropagation();
-            Keyboard.dismiss();
-          }}
-        >
+      <KeyboardAvoidingView style={styles.keyboardAvoidingView} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={24}>
+        <Pressable style={styles.modalOverlay} onPress={Keyboard.dismiss}>
+          <Pressable
+            style={styles.modalSheet}
+            onPress={(event) => {
+              event.stopPropagation();
+              Keyboard.dismiss();
+            }}
+          >
           <Text style={styles.modalTitle}>{mode === "edit" ? "Manzilni tahrirlash" : "Yangi manzil"}</Text>
           <Text style={styles.modalHint}>Manzil nomini kiriting va lokatsiyani xaritadan tanlang.</Text>
           <TextInput
@@ -592,8 +593,9 @@ function AddressFormModal({ visible, draft, saving, mode, onChange, onClose, onP
               {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSaveText}>{mode === "edit" ? "Saqlash" : "Qo'shish"}</Text>}
             </Pressable>
           </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -994,6 +996,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(39,50,72,0.36)"
+  },
+  keyboardAvoidingView: {
+    flex: 1
   },
   modalSheet: {
     marginHorizontal: 16,

@@ -52,7 +52,7 @@ export function ReportModal({ visible, targetType, targetId, title = "Shikoyat y
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheet}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.hint}>Sababni tanlang. Shikoyat moderatorlar tomonidan ko‘rib chiqiladi.</Text>
+          <Text style={styles.hint}>Sababni tanlang. Shikoyat moderatorlar tomonidan ko'rib chiqiladi.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reasons}>
             {reasons.map(([value, label]) => (
               <Pressable key={value} onPress={() => setReason(value)} style={[styles.reason, reason === value && styles.reasonActive]}>
@@ -63,7 +63,7 @@ export function ReportModal({ visible, targetType, targetId, title = "Shikoyat y
           <TextInput
             value={details}
             onChangeText={setDetails}
-            placeholder="Qo‘shimcha ma’lumot (ixtiyoriy)"
+            placeholder="Qo'shimcha ma'lumot (ixtiyoriy)"
             placeholderTextColor="#94A3B8"
             multiline
             maxLength={1000}

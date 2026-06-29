@@ -241,7 +241,7 @@ async function main() {
       phone: demoClientPhone,
       password: "DemoClient-123"
     });
-    assert.equal(disabledDemo.response.status, 404);
+    assert.equal(disabledDemo.response.status, 403);
     assert.equal(disabledDemo.payload.code, "APP_REVIEW_DEMO_DISABLED");
     env.APP_REVIEW_DEMO_ENABLED = true;
 

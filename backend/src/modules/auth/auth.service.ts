@@ -140,7 +140,7 @@ function secureEqual(left: string, right: string) {
 
 function demoModeDisabledError() {
   return Object.assign(new Error("App Review demo login is disabled"), {
-    status: 404,
+    status: 403,
     code: "APP_REVIEW_DEMO_DISABLED"
   });
 }
