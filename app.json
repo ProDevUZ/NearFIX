@@ -2,7 +2,7 @@
   "expo": {
     "name": "NearFIX",
     "slug": "nearfix-mobile",
-    "version": "0.1.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -19,6 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "uz.nearfix.app",
+      "buildNumber": "2026072601",
       "infoPlist": {
         "NSCameraUsageDescription": "NearFIX chatda rasmga olish uchun kameraga ruxsat kerak.",
         "NSPhotoLibraryUsageDescription": "NearFIX chatda rasm tanlash uchun galereyaga ruxsat kerak.",

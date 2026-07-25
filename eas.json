@@ -1,0 +1,23 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://nearfix-production-c0db.up.railway.app",
+        "EXPO_PUBLIC_AUTH_ENABLED": "true",
+        "EXPO_PUBLIC_PAYMENTS_ENABLED": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6782775201"
+      }
+    }
+  }
+}

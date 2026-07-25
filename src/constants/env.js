@@ -1,7 +1,8 @@
+export const PRODUCTION_API_BASE_URL = "https://nearfix-production-c0db.up.railway.app";
+
 export const env = {
-  apiBaseUrl:
-    process.env.EXPO_PUBLIC_API_BASE_URL ||
-    "https://nearfix-production-c0db.up.railway.app",
+  // Keep the store binary independent from local .env files and LAN addresses.
+  apiBaseUrl: PRODUCTION_API_BASE_URL,
   authEnabled: process.env.EXPO_PUBLIC_AUTH_ENABLED !== "false",
   paymentsEnabled: process.env.EXPO_PUBLIC_PAYMENTS_ENABLED === "true",
   mockDataEnabled: process.env.EXPO_PUBLIC_ENABLE_MOCK_DATA === "true",
