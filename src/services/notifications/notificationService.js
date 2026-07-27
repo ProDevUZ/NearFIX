@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { apiRequest } from "../api/client";
 import { httpAuthRequest } from "../api/authenticatedClient";
@@ -55,7 +56,12 @@ export async function registerPushTokenApi(token) {
       return { ok: false, message: "Push notification permission denied" };
     }
 
-    const result = await Notifications.getExpoPushTokenAsync();
+    const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+      return { ok: false, message: "EAS project ID is not configured" };
+    }
+
+    const result = await Notifications.getExpoPushTokenAsync({ projectId });
     const pushToken = result.data;
     const saveResult = await savePushTokenApi(token, pushToken);
     if (!saveResult.ok) return saveResult;

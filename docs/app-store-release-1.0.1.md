@@ -10,13 +10,15 @@
 
 ## Verified locally
 
-Run the release gate before every upload:
+Run the shared Android/iOS release gate before every upload:
 
 ```powershell
-npm run release:verify:ios
+npm run release:verify
 ```
 
-The gate runs ESLint, creates a production iOS export, confirms the production API URL is present, and rejects any localhost or private-LAN API URL using port 4000.
+The gate runs ESLint and Expo Doctor, creates Android and iOS production exports, validates store assets and confirms that no localhost or private-LAN URL is embedded.
+
+See `docs/mobile-store-release.md` for the complete Android/iOS build, credential and store-console checklist.
 
 ## Build and upload
 

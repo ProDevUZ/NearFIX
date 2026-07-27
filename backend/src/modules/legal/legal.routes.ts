@@ -1,5 +1,5 @@
 import { Router, type Response } from "express";
-import { privacyPolicyHtml, termsHtml } from "./legal.pages.js";
+import { accountDeletionHtml, privacyPolicyHtml, termsHtml } from "./legal.pages.js";
 
 export const legalRouter = Router();
 
@@ -20,4 +20,8 @@ legalRouter.get("/privacy", (_request, response) => {
 
 legalRouter.get("/terms", (_request, response) => {
   sendLegalPage(response, termsHtml);
+});
+
+legalRouter.get("/account-deletion", (_request, response) => {
+  sendLegalPage(response, accountDeletionHtml);
 });

@@ -14,7 +14,7 @@ try {
   const address = server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
-  for (const route of ["/legal/privacy", "/legal/terms"]) {
+  for (const route of ["/legal/privacy", "/legal/terms", "/legal/account-deletion"]) {
     const response = await fetch(`${baseUrl}${route}`);
     const html = await response.text();
 
